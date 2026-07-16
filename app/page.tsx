@@ -85,6 +85,30 @@ function CompanyCard({ company, items }: { company: string; items: CompanyItem[]
   );
 }
 
+function MetricRail({ digest }: { digest: Digest }) {
+  const totalSignals = Object.values(digest.companies).reduce((count, items) => count + items.length, 0);
+  const totalVotes = digest.papers.reduce((count, paper) => count + paper.upvotes, 0);
+  return (
+    <div className="metric-rail" aria-label="本期摘要指标">
+      <div>
+        <span>TOP</span>
+        <strong>5</strong>
+        <em>热门论文</em>
+      </div>
+      <div>
+        <span>HF</span>
+        <strong>{totalVotes}</strong>
+        <em>社区赞数</em>
+      </div>
+      <div>
+        <span>LAB</span>
+        <strong>{totalSignals}</strong>
+        <em>官方信号</em>
+      </div>
+    </div>
+  );
+}
+
 function StatusStrip({ digest }: { digest: Digest }) {
   const fresh = digest.fetch_events.filter((event) => event.status === "fresh").length;
   const stale = digest.fetch_events.filter((event) => event.status === "stale-cache").length;
@@ -108,7 +132,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
     <main>
       <header className="site-header">
         <a className="brand" href="/" aria-label="前沿信号首页">
-          <span className="brand-mark">FS</span>
+          <span className="brand-mark">F</span>
           <span><strong>前沿信号</strong><small>FRONTIER SIGNALS</small></span>
         </a>
         <div className="header-note">每日 AI 研究筛选与官方信号追踪</div>
@@ -137,10 +161,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
 
         <div className="content-column">
           <section className="hero">
-            <p className="eyebrow">AI RESEARCH DAILY · {digest.date}</p>
-            <h1>把每天的 AI 噪声，<br /><span>压缩成可验证的研究信号。</span></h1>
-            <p className="hero-copy">精选最新完整日榜中的 5 篇热门论文，并持续观察四家前沿实验室的研究方向。每个结论都保留官方来源和运行证据。</p>
-            <StatusStrip digest={digest} />
+            <div>
+              <p className="eyebrow">AI RESEARCH DAILY · {digest.date}</p>
+              <h1>每日 AI 研究情报台</h1>
+              <p className="hero-copy">从 Hugging Face 热度、arXiv 元数据和前沿实验室官方渠道中，提炼当天最值得进入公众号排版的研究信号。</p>
+              <StatusStrip digest={digest} />
+            </div>
+            <MetricRail digest={digest} />
           </section>
 
           <section className="section-block" id="papers">

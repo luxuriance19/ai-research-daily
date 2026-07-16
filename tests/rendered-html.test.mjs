@@ -18,7 +18,7 @@ test("renders the AI research daily from the validated seed", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>前沿信号｜AI 研究日报<\/title>/i);
-  assert.match(html, /把每天的 AI 噪声/);
+  assert.match(html, /每日 AI 研究情报台/);
   assert.match(html, /热门论文/);
   assert.match(html, /公司研究雷达/);
   assert.match(html, /OpenAI/);
