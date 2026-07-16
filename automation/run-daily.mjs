@@ -10,6 +10,7 @@ const UA = "frontier-signals-daily/1.0";
 const endpoints = {
   hf: "https://huggingface.co/api/daily_papers?limit=100",
   arxiv: "https://export.arxiv.org/api/query",
+  semanticScholar: "https://api.semanticscholar.org/graph/v1/paper/batch",
   openai: "https://openai.com/news/rss.xml",
   anthropic: "https://www.anthropic.com/sitemap.xml",
   deepmind: "https://deepmind.google/blog/rss.xml",
@@ -30,6 +31,7 @@ const directions = {
 const list = (value) => value == null ? [] : Array.isArray(value) ? value : [value];
 const text = (value, limit = 1200) => String(value ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, limit);
 const dateValue = (value) => Number.isFinite(Date.parse(value ?? "")) ? Date.parse(value) : 0;
+const compact = (value, fallback = "") => text(value, 260) || fallback;
 const tagsFor = (...values) => {
   const haystack = values.join(" ").toLowerCase();
   const result = Object.entries(directions).filter(([, words]) => words.some((word) => haystack.includes(word))).map(([name]) => name);
@@ -98,6 +100,43 @@ async function papers() {
   return { date: latest, selected };
 }
 
+async function enrichPaperSignals(paperList) {
+  for (const paper of paperList) {
+    paper.source_signals = [
+      `HF ${paper.upvotes} 赞`,
+      paper.categories.length ? `arXiv ${paper.categories.slice(0, 2).join("/")}` : "arXiv 已核验",
+    ];
+    if (paper.github_url) paper.source_signals.push("代码仓库可见");
+  }
+
+  try {
+    const fields = "title,citationCount,influentialCitationCount,publicationDate,fieldsOfStudy,s2FieldsOfStudy,externalIds,url";
+    const response = await fetchRetry("semantic-scholar", `${endpoints.semanticScholar}?fields=${encodeURIComponent(fields)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: paperList.map((paper) => `ARXIV:${paper.id}`) }),
+    });
+    const rows = await response.json();
+    const byArxiv = new Map(
+      list(rows)
+        .filter(Boolean)
+        .map((row) => [String(row.externalIds?.ArXiv || "").replace(/v\d+$/, ""), row]),
+    );
+    for (const paper of paperList) {
+      const row = byArxiv.get(paper.id);
+      if (!row) continue;
+      if (Number.isFinite(row.citationCount)) paper.source_signals.push(`S2 引用 ${row.citationCount}`);
+      if (Number.isFinite(row.influentialCitationCount) && row.influentialCitationCount > 0) {
+        paper.source_signals.push(`影响引用 ${row.influentialCitationCount}`);
+      }
+      const fields = list(row.s2FieldsOfStudy).map((field) => field.category).filter(Boolean);
+      if (fields.length) paper.source_signals.push(`S2 ${fields.slice(0, 2).join("/")}`);
+    }
+  } catch (error) {
+    warnings.push(`Semantic Scholar 辅助信号失败：${String(error).slice(0, 140)}`);
+  }
+}
+
 function rssItems(xml) {
   const channel = parser.parse(xml).rss?.channel;
   return list(channel?.item).map((item) => ({
@@ -151,13 +190,13 @@ async function companies() {
 
 async function rewriteChinese(paperList, companyMap) {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) { warnings.push("未配置 Gemini，保留来源语言摘要"); return; }
+  if (!key) { warnings.push("未配置 Gemini，使用规则生成论文关键点占位"); return; }
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const source = {
     papers: paperList.map((paper) => ({ id: paper.id, title: paper.title, summary: paper.summary.slice(0, 1000) })),
     companies: Object.fromEntries(Object.entries(companyMap).map(([company, items]) => [company, items.map((item) => ({ url: item.url, title: item.title, summary: item.summary.slice(0, 500) }))])),
   };
-  const prompt = `你是严谨的 AI 研究编辑。仅依据给定 JSON 改写，不添加事实。返回 JSON：papers 按 id 映射到 title_zh、summary_zh、why_zh；companies 按公司名映射到数组，每项原样保留 url，并给出 title_zh、summary_zh。摘要 60-110 个汉字，不输出 Markdown。\n${JSON.stringify(source)}`;
+  const prompt = `你是严谨的 AI 研究编辑。仅依据给定 JSON 改写，不添加事实。返回 JSON：papers 按 id 映射到 title_zh、summary_zh、why_zh、problem_zh、method_zh、key_points_zh、limitations_zh、pub_angle_zh；key_points_zh 为 3-4 条短句。companies 按公司名映射到数组，每项原样保留 url，并给出 title_zh、summary_zh。摘要 60-110 个汉字。limitations_zh 在来源不足时明确写“来源摘要未披露”。不要输出 Markdown。\n${JSON.stringify(source)}`;
   try {
     const response = await fetchRetry("gemini-rewrite", `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
@@ -174,13 +213,37 @@ async function rewriteChinese(paperList, companyMap) {
   } catch (error) { warnings.push(`Gemini 中文改写失败，保留来源文本：${String(error).slice(0, 140)}`); }
 }
 
+function fillPaperInsights(paperList) {
+  for (const paper of paperList) {
+    paper.why_zh = compact(paper.why_zh, "当日社区关注度较高，值得进一步阅读原文。");
+    paper.problem_zh = compact(paper.problem_zh, "从摘要看，论文关注 AI 模型能力、训练或应用中的具体瓶颈。");
+    paper.method_zh = compact(paper.method_zh, "摘要未完整披露方法细节，建议打开论文核验模型、数据和训练设置。");
+    paper.limitations_zh = compact(paper.limitations_zh, "来源摘要未披露，发布前需人工复核实验范围和失败案例。");
+    paper.pub_angle_zh = compact(paper.pub_angle_zh, `${tagsFor(paper.title, paper.summary)[0]}方向的当天热点论文，可结合方法与实验做选题。`);
+    const points = list(paper.key_points_zh).map((point) => compact(point)).filter(Boolean);
+    paper.key_points_zh = points.length ? points.slice(0, 4) : [
+      "保留 Hugging Face、arXiv 与辅助学术信号，方便回溯来源。",
+      "优先阅读摘要、实验设置和结果表，确认是否值得公众号展开。",
+      "若存在代码仓库或 benchmark，可作为工程落地判断依据。",
+    ];
+    paper.source_signals = [...new Set(list(paper.source_signals).map((signal) => compact(signal, "")).filter(Boolean))].slice(0, 6);
+  }
+}
+
 async function main() {
   const { date, selected } = await papers();
+  await enrichPaperSignals(selected);
   const companyMap = await companies();
   await rewriteChinese(selected, companyMap);
+  fillPaperInsights(selected);
   const digest = { date, generated_at: new Date().toISOString(), papers: selected, companies: companyMap, warnings, fetch_events: events };
   if (digest.papers.length !== 5 || new Set(digest.papers.map((paper) => paper.id)).size !== 5) throw new Error("digest validation failed");
   if (process.env.OUTPUT_PATH) await writeFile(process.env.OUTPUT_PATH, `${JSON.stringify(digest, null, 2)}\n`);
+
+  if (process.env.SKIP_INGEST === "1") {
+    console.log(`generated ${date}: ${selected.map((paper) => paper.id).join(", ")}`);
+    return;
+  }
 
   const ingestUrl = process.env.SITE_INGEST_URL;
   const token = process.env.SITE_INGEST_TOKEN;

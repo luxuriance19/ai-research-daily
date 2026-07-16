@@ -5,6 +5,12 @@ export type Paper = {
   summary: string;
   summary_zh?: string;
   why_zh?: string;
+  problem_zh?: string;
+  method_zh?: string;
+  key_points_zh?: string[];
+  limitations_zh?: string;
+  pub_angle_zh?: string;
+  source_signals?: string[];
   authors: string[];
   upvotes: number;
   published_at?: string;

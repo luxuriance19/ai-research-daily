@@ -20,6 +20,10 @@ function paperSummary(paper: Paper) {
   return paper.summary_zh || paper.summary;
 }
 
+function paperKeyPoints(paper: Paper) {
+  return (paper.key_points_zh || []).filter(Boolean).slice(0, 4);
+}
+
 function companyTitle(item: CompanyItem) {
   return item.title_zh || item.title;
 }
@@ -42,6 +46,37 @@ function PaperCard({ paper, rank, maxVotes }: { paper: Paper; rank: number; maxV
         {paper.title_zh && paper.title_zh !== paper.title ? <p className="original-title">{paper.title}</p> : null}
         <p className="paper-summary">{paperSummary(paper)}</p>
         <p className="paper-why"><strong>关注理由</strong>{paper.why_zh || "当日社区关注度较高，值得进一步阅读原文。"}</p>
+        <div className="paper-deep-dive">
+          <div>
+            <span>研究问题</span>
+            <p>{paper.problem_zh || "需要阅读全文后补充更精确的问题定义。"}</p>
+          </div>
+          <div>
+            <span>核心方法</span>
+            <p>{paper.method_zh || "来源摘要未提供足够方法细节，建议进入论文核验。"}</p>
+          </div>
+          {paperKeyPoints(paper).length ? (
+            <div className="wide">
+              <span>关键点</span>
+              <ul>
+                {paperKeyPoints(paper).map((point) => <li key={point}>{point}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          <div>
+            <span>局限与风险</span>
+            <p>{paper.limitations_zh || "当前自动摘要未识别明确局限，发布前建议人工复核实验设置。"}</p>
+          </div>
+          <div>
+            <span>公众号角度</span>
+            <p>{paper.pub_angle_zh || "可作为当日热点论文观察，需结合代码、实验和应用场景再定标题。"}</p>
+          </div>
+        </div>
+        {paper.source_signals?.length ? (
+          <div className="signal-list" aria-label="辅助热度信号">
+            {paper.source_signals.slice(0, 4).map((signal) => <span key={signal}>{signal}</span>)}
+          </div>
+        ) : null}
         <div className="vote-track" aria-label={`${paper.upvotes} 个 Hugging Face 赞`}>
           <span style={{ width: `${voteWidth}%` }} />
         </div>

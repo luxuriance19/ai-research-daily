@@ -19,6 +19,8 @@ test("renders the AI research daily from the validated seed", async () => {
   const html = await response.text();
   assert.match(html, /<title>前沿信号｜AI 研究日报<\/title>/i);
   assert.match(html, /每日 AI 研究情报台/);
+  assert.match(html, /研究问题/);
+  assert.match(html, /公众号角度/);
   assert.match(html, /热门论文/);
   assert.match(html, /公司研究雷达/);
   assert.match(html, /OpenAI/);

@@ -1,98 +1,61 @@
-# vinext-starter
+# 前沿信号 AI 研究日报
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+这个目录是 AI 研究日报的网站层。它保留三种出口：
 
-## Prerequisites
+- OpenAI Sites：快速预览和验收，不作为唯一生产依赖。
+- GitHub Pages：长期兜底的免费静态站点。
+- Cloudflare Pages：长期生产静态站点，可后续扩展 Workers、D1、Cron。
 
-- Node.js `>=22.13.0`
-
-## Quick Start
+## 本地命令
 
 ```bash
 npm install
 npm run dev
 npm run build
+npm test
 ```
 
-This starter does not use `wrangler.jsonc`.
+生成静态独立版：
 
-## Included Shape
-
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+OUTPUT_PATH=data/latest.json SKIP_INGEST=1 node automation/run-daily.mjs
+npm run export:static -- data/latest.json public-pages
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+`public-pages/` 可以直接部署到 GitHub Pages 或 Cloudflare Pages。
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+## 每日发布
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+`.github/workflows/publish-static-sites.yml` 每天北京时间 07:30 运行：
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+1. 拉取 Hugging Face Daily Papers 当天最新完整批次。
+2. 用 arXiv 核验论文元数据。
+3. 用 Semantic Scholar 补充引用和领域信号。
+4. 拉取 OpenAI、Anthropic、Google DeepMind、DeepSeek 官方动态。
+5. 用 Gemini 生成中文摘要、研究问题、核心方法、关键点、局限和公众号角度。
+6. 导出纯静态站点。
+7. 同时发布到 GitHub Pages 和 Cloudflare Pages。
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+## GitHub Secrets
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+GitHub 仓库需要配置：
 
-## Useful Commands
+- `GEMINI_API_KEY`：可选，但建议配置；没有它时会使用规则生成的保守占位。
+- `CLOUDFLARE_API_TOKEN`：Cloudflare Pages 部署 token。
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账号 ID。
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+`GITHUB_TOKEN` 由 GitHub Actions 自动提供，用于 Semantic Scholar/GitHub API 辅助信号和 Pages 部署。
 
-## Learn More
+## Cloudflare Pages
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Cloudflare Pages 项目名默认是：
+
+```text
+frontier-signals-ai-daily
+```
+
+第一次部署前，建议在 Cloudflare 控制台创建同名 Pages 项目，或使用 Wrangler 登录后创建。之后 GitHub Actions 会把 `public-pages/` 发布到这个项目。
+
+## OpenAI Sites
+
+旧的 `.github/workflows/daily-digest.yml` 已改为手动触发，仅用于继续写入 OpenAI Sites 动态预览环境。长期生产发布请使用 `publish-static-sites.yml`。

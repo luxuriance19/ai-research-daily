@@ -1,0 +1,66 @@
+name: Publish static AI digest
+
+on:
+  schedule:
+    - cron: "30 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: static-ai-digest
+  cancel-in-progress: false
+
+jobs:
+  build-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node automation/run-daily.mjs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OUTPUT_PATH: data/latest.json
+          SKIP_INGEST: "1"
+      - run: npm run export:static -- data/latest.json public-pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public-pages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontier-signals-static
+          path: public-pages
+
+  deploy-github-pages:
+    needs: build-static
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  deploy-cloudflare-pages:
+    needs: build-static
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontier-signals-static
+          path: public-pages
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy public-pages --project-name frontier-signals-ai-daily --branch main
