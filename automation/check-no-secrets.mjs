@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, readlinkSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, readlinkSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,6 +44,26 @@ function gitFiles() {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" })
     .split("\0")
     .filter(Boolean);
+}
+
+function explicitFiles() {
+  const requested = process.argv.slice(3);
+  if (requested.length === 0) throw new Error("--paths requires at least one repository-relative path");
+  const files = [];
+  const visit = (absolute) => {
+    const relative = path.relative(root, absolute);
+    if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error("--paths may only scan files inside the repository");
+    }
+    const stat = lstatSync(absolute);
+    if (stat.isDirectory()) {
+      for (const entry of readdirSync(absolute)) visit(path.join(absolute, entry));
+      return;
+    }
+    files.push(relative);
+  };
+  for (const requestedPath of requested) visit(path.resolve(root, requestedPath));
+  return files;
 }
 
 function historyFiles() {
@@ -159,7 +179,7 @@ if (mode === "--self-test") {
 
 const findings = mode === "--history"
   ? scanHistory()
-  : [...new Set(gitFiles())].flatMap((file) => scanFile(file));
+  : [...new Set(mode === "--paths" ? explicitFiles() : gitFiles())].flatMap((file) => scanFile(file));
 if (findings.length > 0) {
   console.error("Secret safety check failed. Values are intentionally redacted:");
   for (const { file, line, rule } of findings) {
