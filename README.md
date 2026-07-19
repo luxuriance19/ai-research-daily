@@ -33,6 +33,17 @@ npm run export:static -- data/latest.json public-pages
 
 `public-pages/` 可以直接部署到 GitHub Pages 或 Cloudflare Pages。
 
+## 面向读者的四栏日报
+
+公开页面不展示来源数量、审计等级、筛选公式或静默运行计数。每天在三条发现链和论文补充完成后，`npm run sync:editorial-site` 会生成 `data/editorial-latest.json`，只投影为四个一级栏目：
+
+1. 前沿模型公司；
+2. 芯片与算力；
+3. 模型规则与底层分析；
+4. Harness 进展。
+
+每条正文按“发生了什么、为什么值得看、关键点、需要保留的边界、一手来源”组织。没有达到门槛的栏目明确留空；普通版本、旧产品解读和 `inspect_evals` 这类底层评分修复只保留在后台审计，不占据新闻版面。`index.html`、`article.html` 与公众号预览 `wechat.html` 使用同一份四栏数据。
+
 ## 模型机制静默监测
 
 `automation/run-mechanism-watch.mjs` 是与网站发布完全分离的采集器，覆盖：
@@ -152,7 +163,7 @@ python3 ../scripts/install_top3_evidence_launchd.py --status
 
 08:42 的证据任务只输出人工审阅文件，通知、公众号与网站发布均关闭。
 
-证据门禁成功后会同时生成一个最小公开展示快照 `data/top3-latest.json`。该快照只保留标题、栏目、分数、中文机制要点、证据上限、结论边界、一手 URL/身份和缺口；不会复制原始响应、缓存或密钥。首页首屏直接读取这份快照，展示当前 K3、Inspect Evals 与 T²MLR 三条、13 个要点；旧 HF Top 5 保留为社区论文补充。快照仍标记 `manual_review_only=true`、通知与发布均为 false；它让本机页面可读，不代表 GitHub Pages 或 Cloudflare Pages 已上线。
+证据门禁成功后仍会生成内部快照 `data/top3-latest.json`，供来源追溯、机制要点和证据边界核对。公开页面不直接把该审计快照当成新闻，而是由四栏编辑投影决定读者看到什么；这避免单个评分工具修复因为机器分数较高而占据整期头条。两层都保持 `manual_review_only=true`，通知与外部消息关闭。
 
 ## 每日发布
 
@@ -162,7 +173,8 @@ python3 ../scripts/install_top3_evidence_launchd.py --status
 2. 只读三份已验证快照，按 48 小时、主身份、技术增量、artifact、独立关注度和时效性确定性选 Top 3。
 3. 排序以后才为三条入选 story 生成 claim-specific 证据包；64 个深度候选端点不在发布关键路径。
 4. 拉取 Hugging Face 最新完整论文批次，并用 arXiv、Semantic Scholar 和四家公司官方源生成社区补充；该补充失败时复用上一快照，不阻断主 Top 3。
-5. 导出并验证纯静态站点，然后发布到 GitHub Pages；Cloudflare Pages 在显式启用后复用同一份 artifact。
+5. 将已验证信号投影成四栏可读新闻；低层审计项留在后台，空栏目不补位。
+6. 导出并验证纯静态站点，然后发布到 GitHub Pages；Cloudflare Pages 在显式启用后复用同一份 artifact。
 
 整个发布入口收敛为一个命令：
 

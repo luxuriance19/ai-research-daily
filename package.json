@@ -6,7 +6,9 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "predev": "node automation/editorial-site-data.mjs",
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "prebuild": "node automation/editorial-site-data.mjs",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --experimental-loader ./tests/cloudflare-loader.mjs --test tests/*.test.mjs",
@@ -36,6 +38,7 @@
     "sync:mechanism-radar-site": "node automation/mechanism-radar-site-data.mjs",
     "sync:source-quality-site": "node automation/source-quality-site-data.mjs",
     "sync:source-role-review": "node automation/source-role-review.mjs",
+    "sync:editorial-site": "node automation/editorial-site-data.mjs",
     "check:daily-health": "node automation/daily-health-check.mjs",
     "daily:fast": "node automation/fast-daily-pipeline.mjs",
     "daily:fast:reuse": "node automation/fast-daily-pipeline.mjs --reuse-discovery --skip-supplement",

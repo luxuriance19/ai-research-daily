@@ -11,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const title = "前沿信号｜少而精的 AI 机制日报";
-  const description = "每天从新模型、底层机制、算力系统与 Harness 中筛选三条代表事件，并标明一手证据、机制要点和结论边界。";
+  const title = "AI 前沿日报｜模型、芯片、底层研究与 Harness";
+  const description = "每天只讲四件事：前沿模型公司、芯片与算力、模型规则与底层研究、Harness 进展。没有重要更新就留空。";
   return {
     metadataBase: new URL(origin),
     title,

@@ -74,6 +74,7 @@ export function createFastDailyPlan() {
         fallback: "data/source-role-review-latest.json",
         commands: [["npm", ["run", "sync:source-role-review"]]],
       },
+      { id: "project-editorial-site", commands: [["npm", ["run", "sync:editorial-site"]]] },
       { id: "render-formula-assets", commands: [["npm", ["run", "sync:formula-assets"]]] },
       { id: "export-static", commands: [["npm", ["run", "export:static", "--", "data/latest.json", "public-pages"]]] },
       { id: "verify-static", commands: [[process.execPath, ["--test", "tests/static-export.test.mjs"]]] },

@@ -32,7 +32,7 @@ test("fast daily critical path is exactly 48 registered discovery sources then T
   assert.equal(FAST_DAILY_POLICY.deep_evidence_after_selection_only, true);
   const criticalCommands = JSON.stringify([...plan.discovery, ...plan.afterDiscovery].flatMap((task) => task.commands));
   for (const excluded of plan.excludedFromCriticalPath) assert.doesNotMatch(criticalCommands, new RegExp(excluded.replaceAll(":", "\\:")));
-  assert.deepEqual(plan.afterDiscovery.map((task) => task.id), ["select-top3", "dossier-top3", "project-mechanism-radar", "project-source-quality", "project-source-role-review", "render-formula-assets", "export-static", "verify-static"]);
+  assert.deepEqual(plan.afterDiscovery.map((task) => task.id), ["select-top3", "dossier-top3", "project-mechanism-radar", "project-source-quality", "project-source-role-review", "project-editorial-site", "render-formula-assets", "export-static", "verify-static"]);
 });
 
 test("reuse mode runs no discovery network commands and records an auditable manifest", async () => {
@@ -48,7 +48,7 @@ test("reuse mode runs no discovery network commands and records an auditable man
     },
   });
   assert.equal(manifest.status, "ok");
-  assert.equal(calls.length, 8);
+  assert.equal(calls.length, 9);
   assert.deepEqual(manifest.stages.slice(0, 3).map((stage) => stage.status), ["reused", "reused", "reused"]);
   assert.equal(manifest.stages.at(-1).id, "verify-static");
   const persisted = JSON.parse(await readFile(join(cwd, "work/fast-daily/run.json"), "utf8"));
