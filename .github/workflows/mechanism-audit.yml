@@ -18,17 +18,18 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Reject committed credentials
+        run: node automation/check-no-secrets.mjs --tracked
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Restore prior audit and bounded source cache
+      - name: Restore prior normalized audit
         uses: actions/cache@v4
         with:
           path: |
             work/mechanism-watch/audit.json
-            work/mechanism-watch/cache
           key: mechanism-watch-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             mechanism-watch-${{ runner.os }}-
@@ -41,6 +42,11 @@ jobs:
           REVIEW_PATH: work/mechanism-watch/review.md
       - name: Enforce no-notification boundary
         run: npm run verify:mechanisms
+      - name: Reject credentials in generated audit evidence
+        run: >-
+          node automation/check-no-secrets.mjs --paths
+          work/mechanism-watch/audit.json
+          work/mechanism-watch/review.md
       - name: Upload audit evidence for human review
         uses: actions/upload-artifact@v4
         with:

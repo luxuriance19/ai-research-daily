@@ -167,7 +167,7 @@ test("manual GitHub workflow verifies the same credential-free fast path", async
   assert.match(workflow, /npm run daily:fast/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
   assert.doesNotMatch(workflow, /GEMINI|OAI_SITES|SITE_INGEST|OPENAI_API|WECHAT/i);
-  assert.doesNotMatch(workflow, /\bsecrets\./i);
+  assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./i);
 });
 
 test("scheduled static workflow preserves the source ledger and dated archives across runs", async () => {
@@ -181,5 +181,16 @@ test("scheduled static workflow preserves the source ledger and dated archives a
   assert.match(workflow, /public-pages/);
   assert.ok(workflow.indexOf("check-no-secrets.mjs --paths") > workflow.indexOf("npm run daily:fast"));
   assert.ok(workflow.indexOf("check-no-secrets.mjs --paths") < workflow.indexOf("actions/upload-pages-artifact@v3"));
+  assert.doesNotMatch(workflow, /^\s+work\/[\w-]+\/cache\s*$/m);
   assert.doesNotMatch(workflow, /GEMINI|OAI_SITES|SITE_INGEST|OPENAI_API|WECHAT/i);
+});
+
+test("every artifact workflow scans generated outputs and never uploads raw response caches", async () => {
+  for (const filename of ["daily-digest.yml", "mechanism-audit.yml", "source-diligence-audit.yml"]) {
+    const workflow = await readFile(join(WEBSITE_DIR, ".github/workflows", filename), "utf8");
+    assert.match(workflow, /check-no-secrets\.mjs --tracked/, filename);
+    assert.match(workflow, /check-no-secrets\.mjs --paths/, filename);
+    assert.ok(workflow.indexOf("check-no-secrets.mjs --paths") < workflow.indexOf("actions/upload-artifact@v4"), filename);
+    assert.doesNotMatch(workflow, /^\s+work\/[\w-]+\/cache\s*$/m, filename);
+  }
 });
