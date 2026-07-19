@@ -1,0 +1,52 @@
+name: Silent model mechanism audit
+
+on:
+  schedule:
+    - cron: "45 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: silent-model-mechanism-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Restore prior audit and bounded source cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            work/mechanism-watch/audit.json
+            work/mechanism-watch/cache
+          key: mechanism-watch-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            mechanism-watch-${{ runner.os }}-
+      - name: Run public-source silent audit
+        run: npm run audit:mechanisms
+        env:
+          OUTPUT_PATH: work/mechanism-watch/audit.json
+          STATE_PATH: work/mechanism-watch/audit.json
+          CACHE_DIR: work/mechanism-watch/cache
+          REVIEW_PATH: work/mechanism-watch/review.md
+      - name: Enforce no-notification boundary
+        run: npm run verify:mechanisms
+      - name: Upload audit evidence for human review
+        uses: actions/upload-artifact@v4
+        with:
+          name: mechanism-audit-${{ github.run_number }}
+          path: |
+            work/mechanism-watch/audit.json
+            work/mechanism-watch/review.md
+          if-no-files-found: error
+          retention-days: 30

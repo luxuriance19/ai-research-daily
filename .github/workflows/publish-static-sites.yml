@@ -17,21 +17,39 @@ concurrency:
 jobs:
   build-static:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - name: Reject committed credentials
+        run: node automation/check-no-secrets.mjs --tracked
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node automation/run-daily.mjs
+      - name: Restore bounded collector state and caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            work/mechanism-watch/audit.json
+            work/mechanism-watch/cache
+            work/model-compute-source-probe/audit.json
+            work/model-compute-source-probe/cache
+            work/tech-discovery-probe/audit.json
+            work/tech-discovery-probe/cache
+            work/top3-evidence-dossier/cache
+            data/source-quality-latest.json
+            public-pages/archive
+          key: daily-intelligence-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            daily-intelligence-${{ runner.os }}-
+      - name: Run fast daily path (48 discovery endpoints to Top 3)
+        run: npm run daily:fast
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OUTPUT_PATH: data/latest.json
           SKIP_INGEST: "1"
-      - run: npm run export:static -- data/latest.json public-pages
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public-pages
@@ -39,6 +57,21 @@ jobs:
         with:
           name: frontier-signals-static
           path: public-pages
+      - name: Upload silent audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontier-signals-audit
+          path: |
+            work/unified-top3-replay/audit.json
+            work/unified-top3-replay/review.md
+            work/top3-evidence-dossier/audit.json
+            work/top3-evidence-dossier/review.md
+            work/fast-daily/run.json
+            data/source-quality-latest.json
+            data/source-role-review-latest.json
+            data/source-role-review-latest.md
+          if-no-files-found: error
+          retention-days: 30
 
   deploy-github-pages:
     needs: build-static
@@ -51,6 +84,7 @@ jobs:
         uses: actions/deploy-pages@v4
 
   deploy-cloudflare-pages:
+    if: ${{ vars.CLOUDFLARE_ENABLED == 'true' }}
     needs: build-static
     runs-on: ubuntu-latest
     timeout-minutes: 10

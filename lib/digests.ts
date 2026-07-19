@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import latestDigest from "@/data/latest.json";
 import seedDigest from "@/data/seed.json";
 import type { Digest } from "./types";
 
@@ -70,9 +71,12 @@ export async function upsertDigest(digest: Digest): Promise<void> {
 }
 
 export async function listDigests(limit = 45): Promise<Digest[]> {
+  const fallbackDigests = [latestDigest as Digest, seedDigest as Digest].filter(
+    (digest, index, all) => all.findIndex((candidate) => candidate.date === digest.date) === index,
+  );
   try {
     const db = await database();
-    if (!db) return [seedDigest as Digest];
+    if (!db) return fallbackDigests;
     const result = await db
       .prepare("SELECT payload_json FROM digests ORDER BY date DESC LIMIT ?1")
       .bind(limit)
@@ -80,11 +84,11 @@ export async function listDigests(limit = 45): Promise<Digest[]> {
     const records = result.results
       .map((row) => parseDigest(row.payload_json))
       .filter((digest): digest is Digest => digest !== null);
-    if (!records.some((digest) => digest.date === (seedDigest as Digest).date)) {
-      records.push(seedDigest as Digest);
+    for (const fallback of fallbackDigests) {
+      if (!records.some((digest) => digest.date === fallback.date)) records.push(fallback);
     }
     return records.sort((a, b) => b.date.localeCompare(a.date));
   } catch {
-    return [seedDigest as Digest];
+    return fallbackDigests;
   }
 }

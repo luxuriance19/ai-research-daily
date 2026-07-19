@@ -1,0 +1,104 @@
+{
+  "provenance": {
+    "snapshot_date": "2026-07-17",
+    "kind": "historical-derived-static-fixtures",
+    "network_required": false
+  },
+  "constitution": {
+    "tracked_path": "20260120-constitution.md",
+    "previous": {
+      "head_sha": "84fa9a271183-old",
+      "files": [
+        { "path": "README.md", "sha": "readme-1" },
+        { "path": "20260120-constitution.md", "sha": "constitution-20260120" }
+      ]
+    },
+    "current": {
+      "head_sha": "20260701-new-constitution",
+      "files": [
+        { "path": "README.md", "sha": "readme-2" },
+        { "path": "20260120-constitution.md", "sha": "constitution-20260120" },
+        { "path": "20260701-constitution.md", "sha": "constitution-20260701" }
+      ]
+    }
+  },
+  "ouro": {
+    "previous_paper": {
+      "id": "2510.25741v4",
+      "updated_at": "2026-05-18T00:00:00Z",
+      "content_sha256": "ouro-paper-v4"
+    },
+    "current_paper": {
+      "id": "2510.25741v5",
+      "updated_at": "2026-07-01T23:25:58Z",
+      "content_sha256": "ouro-paper-v5"
+    },
+    "previous_artifact": {
+      "id": "ByteDance/Ouro-2.6B",
+      "revision_sha": "1ed04250da1a9936042725d302e81c8fa2ab5abd"
+    },
+    "current_artifact": {
+      "id": "ByteDance/Ouro-2.6B",
+      "revision_sha": "1ed04250da1a9936042725d302e81c8fa2ab5abd"
+    }
+  },
+  "coconut": {
+    "previous": {
+      "default_branch_head_sha": "27273cb8cca4",
+      "pushed_at": "2025-08-12T17:14:04Z"
+    },
+    "current": {
+      "default_branch_head_sha": "27273cb8cca4",
+      "pushed_at": "2026-07-02T08:17:30Z"
+    }
+  },
+  "releases": {
+    "feed_window_size": 10,
+    "pages": [
+      [
+        { "id": 20, "tag_name": "0.145.0-alpha.20", "prerelease": true, "published_at": "2026-07-17T03:07:19Z" },
+        { "id": 19, "tag_name": "0.145.0-alpha.19", "prerelease": true, "published_at": "2026-07-16T22:13:47Z" },
+        { "id": 18, "tag_name": "rust-v0.145.0-alpha.18", "prerelease": true, "published_at": "2026-07-16T18:15:04Z" },
+        { "id": 17, "tag_name": "0.145.0-alpha.17", "prerelease": true, "published_at": "2026-07-16T16:43:25Z" },
+        { "id": 16, "tag_name": "0.145.0-alpha.16", "prerelease": true, "published_at": "2026-07-16T05:25:26Z" },
+        { "id": 15, "tag_name": "0.145.0-alpha.15", "prerelease": true, "published_at": "2026-07-16T00:34:23Z" },
+        { "id": 14, "tag_name": "0.145.0-alpha.14", "prerelease": true, "published_at": "2026-07-15T22:05:07Z" },
+        { "id": 13, "tag_name": "0.145.0-alpha.13", "prerelease": true, "published_at": "2026-07-15T07:51:51Z" },
+        { "id": 12, "tag_name": "python-v0.145.0-alpha.12", "prerelease": true, "published_at": "2026-07-15T06:00:00Z" },
+        { "id": 11, "tag_name": "0.145.0-alpha.11", "prerelease": true, "published_at": "2026-07-15T05:00:00Z" }
+      ],
+      [
+        { "id": 10, "tag_name": "0.145.0-alpha.10", "prerelease": true, "published_at": "2026-07-15T04:00:00Z" },
+        { "id": 9, "tag_name": "rust-v0.145.0-alpha.9", "prerelease": true, "published_at": "2026-07-15T03:00:00Z" },
+        { "id": 8, "tag_name": "0.144.5", "prerelease": false, "published_at": "2026-07-16T02:56:18Z" },
+        { "id": 7, "tag_name": "python-v0.144.4", "prerelease": false, "published_at": "2026-07-14T21:41:00Z" }
+      ]
+    ]
+  },
+  "evaluation": {
+    "previous": {
+      "task_versions": { "mgsm_direct": 3, "squad_v2": 2 },
+      "scorer_hash": "scorer-before",
+      "grader_version": "grader-1",
+      "dataset_revision": "dataset-1",
+      "environment_revision": "sandbox-1",
+      "ui_version": "ui-1"
+    },
+    "current": {
+      "task_versions": { "mgsm_direct": 4, "squad_v2": 2 },
+      "scorer_hash": "scorer-after",
+      "grader_version": "grader-1",
+      "dataset_revision": "dataset-1",
+      "environment_revision": "sandbox-1",
+      "ui_version": "ui-2"
+    }
+  },
+  "editorial": {
+    "editorial_signals": [
+      { "source": "latent-space", "independence_group": "latent-space" },
+      { "source": "ainews", "independence_group": "latent-space" },
+      { "source": "hacker-news", "independence_group": "hacker-news" }
+    ],
+    "primary_artifacts": []
+  }
+}
