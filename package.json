@@ -55,6 +55,7 @@
     "security:secrets": "node automation/check-no-secrets.mjs --all",
     "security:secrets:history": "node automation/check-no-secrets.mjs --history",
     "security:secrets:self-test": "node automation/check-no-secrets.mjs --self-test",
+    "ensure:cloudflare-pages": "node automation/ensure-cloudflare-pages.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
