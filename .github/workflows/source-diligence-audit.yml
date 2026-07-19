@@ -20,6 +20,8 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - name: Reject committed credentials
+        run: node automation/check-no-secrets.mjs --tracked
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -30,15 +32,10 @@ jobs:
         with:
           path: |
             work/mechanism-watch/audit.json
-            work/mechanism-watch/cache
             work/model-compute-source-probe/audit.json
-            work/model-compute-source-probe/cache
             work/candidate-source-probe/audit.json
-            work/candidate-source-probe/cache
             work/tech-discovery-probe/audit.json
-            work/tech-discovery-probe/cache
             work/evidence-gap-scout/audit.json
-            work/evidence-gap-scout/cache
           key: daily-intelligence-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             daily-intelligence-${{ runner.os }}-
@@ -55,6 +52,22 @@ jobs:
           npm run gate:source-readiness
           npm run scout:evidence-gaps
           npm run verify:evidence-scout
+      - name: Reject credentials in normalized state and audit evidence
+        run: >-
+          node automation/check-no-secrets.mjs --paths
+          work/mechanism-watch/audit.json
+          work/model-compute-source-probe/audit.json
+          work/tech-discovery-probe/audit.json
+          work/candidate-source-probe/audit.json
+          work/candidate-source-probe/review.md
+          work/source-diligence/coverage.json
+          work/source-diligence/review.md
+          work/semantic-review-dossiers/dossier.json
+          work/semantic-review-dossiers/review.md
+          work/source-promotion-readiness/readiness.json
+          work/source-promotion-readiness/readiness.md
+          work/evidence-gap-scout/audit.json
+          work/evidence-gap-scout/review.md
       - name: Upload silent diligence evidence
         uses: actions/upload-artifact@v4
         with:

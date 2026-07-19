@@ -622,6 +622,6 @@ test("scheduled GitHub audit has read-only permissions and no deployment or secr
   assert.match(workflow, /actions\/cache@v4/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
   assert.match(workflow, /npm run verify:mechanisms/);
-  assert.doesNotMatch(workflow, /\bsecrets\./i);
+  assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./i);
   assert.doesNotMatch(workflow, /deploy|wrangler|wechat|slack|webhook/i);
 });

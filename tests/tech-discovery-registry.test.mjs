@@ -59,22 +59,26 @@ test("unattended endpoints honor the current robots and content-use admission de
   }
 });
 
-test("editorial discovery reuses snapshots while the bounded official release bundle is self-contained", () => {
+test("editorial discovery fetches public feeds while the bounded official release bundle is self-contained", () => {
   const latent = getTechDiscoverySource("latent-space-existing-snapshot");
-  assert.equal(latent.fetch_mode, "reference-existing-snapshot");
-  assert.equal(latent.managed_by, "candidate-source-registry");
-  assert.deepEqual(latent.existing_source_ids, ["latent-space-feed"]);
-  assert.equal(latent.limits.request_budget, 0);
+  assert.equal(latent.endpoint, "https://www.latent.space/feed");
+  assert.equal(latent.format, "rss-or-atom");
+  assert.equal(latent.fetch_mode, "network-shadow");
+  assert.equal(latent.managed_by, "tech-discovery-registry");
+  assert.deepEqual(latent.existing_source_ids, []);
+  assert.equal(latent.limits.request_budget, 3);
 
   const interconnects = getTechDiscoverySource("interconnects-existing-snapshot");
-  assert.equal(interconnects.fetch_mode, "reference-existing-snapshot");
-  assert.deepEqual(interconnects.existing_source_ids, ["interconnects-feed"]);
-  assert.equal(interconnects.limits.request_budget, 0);
+  assert.equal(interconnects.endpoint, "https://www.interconnects.ai/feed");
+  assert.equal(interconnects.fetch_mode, "network-shadow");
+  assert.deepEqual(interconnects.existing_source_ids, []);
+  assert.equal(interconnects.limits.request_budget, 3);
 
   const simon = getTechDiscoverySource("simon-willison-existing-snapshot");
-  assert.equal(simon.fetch_mode, "reference-existing-snapshot");
-  assert.deepEqual(simon.existing_source_ids, ["simon-willison-feed"]);
-  assert.equal(simon.limits.request_budget, 0);
+  assert.equal(simon.endpoint, "https://simonwillison.net/atom/everything/");
+  assert.equal(simon.fetch_mode, "network-shadow");
+  assert.deepEqual(simon.existing_source_ids, []);
+  assert.equal(simon.limits.request_budget, 3);
 
   const releases = getTechDiscoverySource("official-github-releases-existing-snapshots");
   assert.equal(releases.authority_tier, "T1");

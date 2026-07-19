@@ -11,7 +11,6 @@ import {
   normalizedEventIdentity,
   parseGitHubTrending,
   parseRssDiscovery,
-  reuseCandidateSnapshots,
   runTechDiscoveryProbe,
   selectDailyCurrentWindowReview,
   selectHumanReviewQueue,
@@ -122,135 +121,29 @@ test("Hacker News uses one topstories GET plus a bounded item fanout and baselin
   assert.deepEqual(verifyTechDiscoveryProbe(audit, [source]), { ok: true, errors: [] });
 });
 
-function candidateFixture(generatedAt, { extraLatent = false, extraRelease = false } = {}) {
-  const releaseSources = [
-    ["openai-agents-sdk-releases", "openai/openai-agents-python"],
-    ["claude-agent-sdk-releases", "anthropics/claude-agent-sdk-python"],
-    ["google-adk-releases", "google/adk-python"],
-    ["microsoft-agent-framework-releases", "microsoft/agent-framework"],
-    ["helm-releases", "stanford-crfm/helm"],
-    ["inspect-evals-releases", "UKGovernmentBEIS/inspect_evals"],
-  ];
-  const sourceRegistry = releaseSources.map(([id, repository]) => ({
-    id,
-    url: `https://api.github.com/repos/${repository}/releases?per_page=50&page=1`,
-  }));
-  sourceRegistry.push(
-    { id: "latent-space-feed", url: "https://www.latent.space/feed" },
-    { id: "interconnects-feed", url: "https://www.interconnects.ai/feed" },
-    { id: "simon-willison-feed", url: "https://simonwillison.net/atom/everything/" },
-  );
-  const sourceEvents = releaseSources.map(([id], index) => ({
-    source_id: id,
-    status: "fresh",
-    network_verified: true,
-    snapshot: {
-      releases: [
-        ...(extraRelease && id === "openai-agents-sdk-releases" ? [{
-          id: "new-release",
-          tag_name: "v2.0.0",
-          published_at: "2026-07-17T10:20:00Z",
-          prerelease: false,
-          immutable: false,
-          body_sha256: "new-body",
-        }] : []),
-        {
-          id: `baseline-${index}`,
-          tag_name: "v1.0.0",
-          published_at: "2026-07-17T08:00:00Z",
-          prerelease: false,
-          immutable: false,
-          body_sha256: `baseline-body-${index}`,
-        },
-      ],
-    },
-  }));
-  sourceEvents.push({
-    source_id: "latent-space-feed",
-    status: "not-modified",
-    network_verified: true,
-    snapshot: {
-      items: [
-        ...(extraLatent ? [{
-          id: "https://www.latent.space/p/new-agent-eval",
-          title: "[AINews] New agent harness evaluation benchmark released",
-          url: "https://www.latent.space/p/new-agent-eval",
-          published_at: "2026-07-17T10:15:00Z",
-          artifact_links: [{ url: "https://github.com/lab/new-eval", requires_primary_verification: true }],
-        }] : []),
-        {
-          id: "https://www.latent.space/p/baseline-model",
-          title: "[AINews] A new open model released",
-          url: "https://www.latent.space/p/baseline-model",
-          published_at: "2026-07-17T08:30:00Z",
-          artifact_links: [],
-        },
-      ],
-    },
-  });
-  sourceEvents.push(
-    {
-      source_id: "interconnects-feed",
-      status: "fresh",
-      network_verified: true,
-      snapshot: {
-        items: [{
-          id: "https://www.interconnects.ai/p/post-training",
-          title: "A field guide to RLHF post-training and distillation",
-          url: "https://www.interconnects.ai/p/post-training",
-          published_at: "2026-07-17T08:10:00Z",
-          artifact_links: [{ url: "https://arxiv.org/abs/2607.00001v1", link_context: "Primary paper" }],
-        }],
-      },
-    },
-    {
-      source_id: "simon-willison-feed",
-      status: "not-modified",
-      network_verified: true,
-      snapshot: {
-        items: [{
-          id: "https://simonwillison.net/2026/Jul/17/agent-sdk/",
-          title: "A reproducible look at a new agent SDK release",
-          url: "https://simonwillison.net/2026/Jul/17/agent-sdk/",
-          published_at: "2026-07-17T08:20:00Z",
-          artifact_links: [{ url: "https://github.com/lab/agent-sdk/releases/tag/v1.0.0", link_context: "Official release" }],
-        }],
-      },
-    },
-  );
-  return { schema_version: 1, generated_at: generatedAt, source_registry: sourceRegistry, source_events: sourceEvents };
-}
-
-test("Latent Space is reused from a fresh candidate snapshot with zero duplicate requests", async () => {
+test("Latent Space is fetched directly on the fast path and remains human-review-only", async () => {
   const now = new Date("2026-07-17T10:30:00Z");
-  const candidate = candidateFixture("2026-07-17T10:25:00Z");
   const latentSource = cloneSource("latent-space-existing-snapshot");
-  const latent = reuseCandidateSnapshots(latentSource, candidate, { now });
-  assert.equal(latent.status, "reused-fresh-snapshot");
-  assert.equal(latent.requests_made, 0);
-  assert.equal(latent.items.length, 1);
-
   const paths = await tempPaths();
-  await writeFile(paths.candidateAuditPath, `${JSON.stringify(candidate)}\n`);
+  const baseline = `<rss><channel><item><title>[AINews] A new open model released</title><link>https://www.latent.space/p/baseline-model</link><pubDate>Fri, 17 Jul 2026 08:30:00 GMT</pubDate></item></channel></rss>`;
   let networkCalls = 0;
   const audit = await runTechDiscoveryProbe({
     sources: [latentSource],
     ...paths,
-    fetchImpl: async () => { networkCalls += 1; throw new Error("must-not-fetch"); },
+    fetchImpl: async () => { networkCalls += 1; return response(baseline); },
     now,
   });
-  assert.equal(networkCalls, 0);
+  assert.equal(networkCalls, 1);
   assert.equal(audit.metrics.onboarding_baselines, 1);
   assert.equal(audit.metrics.selected_for_human_review, 0);
-  assert.ok(audit.source_events.every((event) => event.upstream_snapshot_network_verified && !event.network_fresh));
+  assert.ok(audit.source_events.every((event) => event.network_fresh && event.requests_made === 1));
   assert.deepEqual(verifyTechDiscoveryProbe(audit, [latentSource]), { ok: true, errors: [] });
 
-  const next = candidateFixture("2026-07-17T10:35:00Z", { extraLatent: true, extraRelease: true });
-  await writeFile(paths.candidateAuditPath, `${JSON.stringify(next)}\n`);
+  const changedFeed = baseline.replace("</channel>", `<item><title>[AINews] New agent harness evaluation benchmark released</title><link>https://www.latent.space/p/new-agent-eval</link><pubDate>Fri, 17 Jul 2026 10:15:00 GMT</pubDate></item></channel>`);
   const changed = await runTechDiscoveryProbe({
     sources: [latentSource],
     ...paths,
-    fetchImpl: async () => { throw new Error("must-not-fetch"); },
+    fetchImpl: async () => response(changedFeed),
     now: new Date("2026-07-17T10:40:00Z"),
   });
   assert.equal(changed.metrics.new_discovery_candidates, 1);
@@ -353,11 +246,9 @@ test("a bounded network-verified release cache may retain editorial review but n
   assert.deepEqual(verifyTechDiscoveryProbe(retained, [releaseSource]), { ok: true, errors: [] });
 });
 
-test("Interconnects and Simon Willison reuse candidate editorial snapshots with zero network requests", async () => {
+test("Interconnects and Simon Willison are direct bounded feeds with no publication authority", async () => {
   const paths = await tempPaths();
   const now = new Date("2026-07-17T10:30:00Z");
-  const candidate = candidateFixture("2026-07-17T10:25:00Z");
-  await writeFile(paths.candidateAuditPath, `${JSON.stringify(candidate)}\n`);
   const sources = [
     cloneSource("interconnects-existing-snapshot"),
     cloneSource("simon-willison-existing-snapshot"),
@@ -366,15 +257,18 @@ test("Interconnects and Simon Willison reuse candidate editorial snapshots with 
   const audit = await runTechDiscoveryProbe({
     sources,
     ...paths,
-    fetchImpl: async () => { networkCalls += 1; throw new Error("must-not-fetch"); },
+    fetchImpl: async (url) => {
+      networkCalls += 1;
+      const simon = String(url).includes("simonwillison.net");
+      return response(`<rss><channel><item><title>${simon ? "A reproducible look at a new agent SDK release" : "A field guide to RLHF post-training and distillation"}</title><link>${simon ? "https://simonwillison.net/2026/Jul/17/agent-sdk/" : "https://www.interconnects.ai/p/post-training"}</link><pubDate>Fri, 17 Jul 2026 08:20:00 GMT</pubDate></item></channel></rss>`);
+    },
     now,
   });
-  assert.equal(networkCalls, 0);
-  assert.equal(audit.metrics.reused_snapshot_sources, 2);
+  assert.equal(networkCalls, 2);
+  assert.equal(audit.metrics.reused_snapshot_sources, 0);
   assert.equal(audit.metrics.onboarding_baselines, 2);
   assert.equal(audit.metrics.selected_for_human_review, 0);
-  assert.ok(audit.source_events.every((event) => event.requests_made === 0));
-  assert.ok(audit.source_events.every((event) => event.upstream_snapshot_network_verified && !event.network_fresh));
+  assert.ok(audit.source_events.every((event) => event.requests_made === 1 && event.network_fresh));
   assert.ok(audit.source_events.flatMap((event) => event.items).every((item) => item.primary_verified === false));
   assert.deepEqual(audit.notification_policy.records, []);
   assert.deepEqual(verifyTechDiscoveryProbe(audit, sources), { ok: true, errors: [] });
@@ -600,49 +494,6 @@ test("Kimi K3 replay merges HN, Latent Space, and Simon into a current-window st
   assert.equal(unrelatedOfficialLink.basis, "primary-artifact-link");
   assert.equal(unrelatedOfficialLink.fingerprint, "huggingface:deepseek-ai/deepseek-v4-pro");
 
-  const candidateAudit = {
-    schema_version: 1,
-    generated_at: "2026-07-17T09:58:00Z",
-    source_registry: [
-      { id: "latent-space-feed", url: "https://www.latent.space/feed" },
-      { id: "simon-willison-feed", url: "https://simonwillison.net/atom/everything/" },
-    ],
-    source_events: [
-      {
-        source_id: "latent-space-feed",
-        status: "fresh",
-        network_verified: true,
-        snapshot: {
-          items: [{
-            id: "latent-k3",
-            title: "[AINews] Kimi K3: new 2.8T MoE model",
-            url: "https://www.latent.space/p/kimi-k3",
-            published_at: "2026-07-17T01:46:36Z",
-            artifact_links: [{ url: officialUrl, link_context: "Official Kimi K3 announcement" }],
-          }],
-        },
-      },
-      {
-        source_id: "simon-willison-feed",
-        status: "not-modified",
-        network_verified: true,
-        snapshot: {
-          items: [{
-            id: "simon-k3",
-            title: "Kimi K3 is a new MoE model with an agent harness caveat",
-            url: "https://simonwillison.net/2026/Jul/16/kimi-k3/",
-            published_at: "2026-07-16T20:19:30Z",
-            artifact_links: [
-              { url: "https://huggingface.co/deepseek-ai/deepseek-v4-pro", link_context: "Unrelated model link" },
-              { url: officialUrl, link_context: "Official Kimi K3 announcement" },
-            ],
-          }],
-        },
-      },
-    ],
-  };
-  await writeFile(paths.candidateAuditPath, `${JSON.stringify(candidateAudit)}\n`);
-
   const sources = [
     cloneSource("hacker-news-topstories", { limits: { max_items: 1, request_budget: 2, max_bytes: 20_000 } }),
     cloneSource("latent-space-existing-snapshot"),
@@ -657,9 +508,16 @@ test("Kimi K3 replay merges HN, Latent Space, and Simon into a current-window st
     title: "Kimi K3: new 2.8T MoE model",
     url: officialUrl,
   };
-  const fetchImpl = async (url) => String(url).endsWith("topstories.json")
-    ? response(JSON.stringify([hnItem.id]))
-    : response(JSON.stringify(hnItem));
+  const latentFeed = `<rss><channel><item><title>[AINews] Kimi K3: new 2.8T MoE model</title><link>https://www.latent.space/p/kimi-k3</link><pubDate>Fri, 17 Jul 2026 01:46:36 GMT</pubDate><description><![CDATA[Official Kimi K3 announcement: <a href="${officialUrl}">primary source</a>]]></description></item></channel></rss>`;
+  const simonFeed = `<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Kimi K3 is a new MoE model with an agent harness caveat</title><link href="https://simonwillison.net/2026/Jul/16/kimi-k3/"/><updated>2026-07-16T20:19:30Z</updated><content type="html"><![CDATA[Unrelated <a href="https://huggingface.co/deepseek-ai/deepseek-v4-pro">model</a>; official <a href="${officialUrl}">Kimi K3 announcement</a>.]]></content></entry></feed>`;
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.endsWith("topstories.json")) return response(JSON.stringify([hnItem.id]));
+    if (value.includes("hacker-news.firebaseio.com/v0/item/")) return response(JSON.stringify(hnItem));
+    if (value.includes("latent.space")) return response(latentFeed);
+    if (value.includes("simonwillison.net")) return response(simonFeed);
+    throw new Error(`unexpected URL: ${value}`);
+  };
 
   const first = await runTechDiscoveryProbe({
     sources,
