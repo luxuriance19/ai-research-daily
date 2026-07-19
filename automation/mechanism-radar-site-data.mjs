@@ -83,6 +83,47 @@ function sourceObservation(candidateAudit, sourceIds) {
   };
 }
 
+function unavailableSourceObservation() {
+  return {
+    observed_days: 0,
+    required_days: REQUIRED_DAYS,
+    state: "supplemental-audit-not-run",
+    degraded_source_count: 0,
+    review_flag_count: 0,
+    human_review_complete: false,
+  };
+}
+
+export function buildCriticalPathMechanismRadarSiteData(generatedAt) {
+  const timestamp = new Date(generatedAt);
+  if (!Number.isFinite(timestamp.getTime())) throw new Error("critical-path mechanism radar requires a valid generated_at");
+  const siteData = {
+    schema_version: 1,
+    mode: "local-mechanism-radar-site-snapshot",
+    generated_at: timestamp.toISOString(),
+    status: "awaiting-supplemental-audits",
+    manual_review_only: true,
+    notification_enabled: false,
+    publishing_enabled: false,
+    supplemental_audits_available: false,
+    current_event_candidates: 0,
+    cards: RADAR_CONFIG.map((config) => ({
+      id: config.id,
+      layer: config.layer,
+      title: config.title,
+      thesis_zh: config.thesis_zh,
+      boundary_zh: config.boundary_zh,
+      primary_url: config.primary_url,
+      current_event: false,
+      attention_level: "A0",
+      claim_metrics: claimMetrics([]),
+      source_observation: unavailableSourceObservation(),
+    })),
+  };
+  siteData.snapshot_fingerprint = sha256(JSON.stringify(siteData));
+  return siteData;
+}
+
 export function buildMechanismRadarSiteData(candidateAudit, diligenceAudit) {
   if (candidateAudit?.mode !== "shadow-source-probe") throw new Error("unexpected candidate audit mode");
   if (diligenceAudit?.mode !== "source-diligence-audit") throw new Error("unexpected source diligence mode");
@@ -137,13 +178,25 @@ async function atomicWrite(path, body) {
 export async function syncMechanismRadarSiteData({
   candidatePath = resolve("work/candidate-source-probe/audit.json"),
   diligencePath = resolve("work/source-diligence/coverage.json"),
+  mechanismPath = resolve("work/mechanism-watch/audit.json"),
   outputPath = resolve("data/mechanism-radar-latest.json"),
 } = {}) {
-  const [candidateAudit, diligenceAudit] = await Promise.all([
-    readFile(candidatePath, "utf8").then(JSON.parse),
-    readFile(diligencePath, "utf8").then(JSON.parse),
+  const readOptionalJson = async (path) => {
+    try {
+      return JSON.parse(await readFile(path, "utf8"));
+    } catch (error) {
+      if (error?.code === "ENOENT") return null;
+      throw error;
+    }
+  };
+  const [candidateAudit, diligenceAudit, mechanismAudit] = await Promise.all([
+    readOptionalJson(candidatePath),
+    readOptionalJson(diligencePath),
+    readFile(mechanismPath, "utf8").then(JSON.parse),
   ]);
-  const siteData = buildMechanismRadarSiteData(candidateAudit, diligenceAudit);
+  const siteData = candidateAudit && diligenceAudit
+    ? buildMechanismRadarSiteData(candidateAudit, diligenceAudit)
+    : buildCriticalPathMechanismRadarSiteData(mechanismAudit.generated_at);
   const verified = verifyMechanismRadarSiteData(siteData);
   if (!verified.ok) throw new Error(verified.errors.join("; "));
   await atomicWrite(outputPath, `${JSON.stringify(siteData, null, 2)}\n`);
@@ -154,6 +207,7 @@ async function main() {
   const siteData = await syncMechanismRadarSiteData({
     candidatePath: resolve(process.env.MECHANISM_RADAR_CANDIDATE_PATH || "work/candidate-source-probe/audit.json"),
     diligencePath: resolve(process.env.MECHANISM_RADAR_DILIGENCE_PATH || "work/source-diligence/coverage.json"),
+    mechanismPath: resolve(process.env.MECHANISM_RADAR_MECHANISM_PATH || "work/mechanism-watch/audit.json"),
     outputPath: resolve(process.env.MECHANISM_RADAR_OUTPUT_PATH || "data/mechanism-radar-latest.json"),
   });
   process.stdout.write(`${JSON.stringify({ status: siteData.status, cards: siteData.cards.length, current_events: siteData.current_event_candidates }, null, 2)}\n`);

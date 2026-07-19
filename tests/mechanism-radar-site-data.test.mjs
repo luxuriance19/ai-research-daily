@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { buildMechanismRadarSiteData, verifyMechanismRadarSiteData } from "../automation/mechanism-radar-site-data.mjs";
+import {
+  buildCriticalPathMechanismRadarSiteData,
+  buildMechanismRadarSiteData,
+  syncMechanismRadarSiteData,
+  verifyMechanismRadarSiteData,
+} from "../automation/mechanism-radar-site-data.mjs";
 
 const sourceIds = [
   "claude-constitution-tree", "claude-constitution-readme", "latent-reasoning-arxiv-seeds",
@@ -51,4 +59,27 @@ test("mechanism radar exposes four claim-bounded tracks without manufacturing ne
   assert.equal(radar.cards.find((card) => card.id === "claude-constitution").source_observation.observed_days, 2);
   assert.equal(radar.cards.find((card) => card.id === "harness-progress").source_observation.state, "degraded");
   assert.match(radar.cards.find((card) => card.id === "coconut-continuous-thought").boundary_zh, /忠实|因果/);
+});
+
+test("cold critical path projects four bounded tracks when slow audits have not run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "mechanism-radar-cold-"));
+  try {
+    const mechanismPath = join(root, "mechanism.json");
+    const outputPath = join(root, "radar.json");
+    await writeFile(mechanismPath, JSON.stringify({ generated_at: "2026-07-19T02:00:00.000Z" }));
+    const radar = await syncMechanismRadarSiteData({
+      candidatePath: join(root, "missing-candidate.json"),
+      diligencePath: join(root, "missing-diligence.json"),
+      mechanismPath,
+      outputPath,
+    });
+    assert.deepEqual(radar, buildCriticalPathMechanismRadarSiteData("2026-07-19T02:00:00.000Z"));
+    assert.deepEqual(verifyMechanismRadarSiteData(radar), { ok: true, errors: [] });
+    assert.equal(radar.status, "awaiting-supplemental-audits");
+    assert.equal(radar.cards.length, 4);
+    assert.equal(radar.cards.every((card) => card.source_observation.state === "supplemental-audit-not-run"), true);
+    assert.equal(JSON.parse(await readFile(outputPath, "utf8")).snapshot_fingerprint, radar.snapshot_fingerprint);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
