@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { writeFile } from "node:fs/promises";
 import { XMLParser } from "fast-xml-parser";
+import { selectLatestCompleteBatch } from "./daily-paper-selection.mjs";
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
 const events = [];
@@ -61,12 +62,9 @@ async function fetchRetry(source, url, options = {}) {
 
 async function papers() {
   const source = await (await fetchRetry("huggingface-daily", endpoints.hf)).json();
-  const dated = source.map((item) => item.paper || item).filter((paper) => paper.id && paper.submittedOnDailyAt);
-  const latestMs = Math.max(...dated.map((paper) => dateValue(paper.submittedOnDailyAt)));
-  const latest = new Date(latestMs).toISOString().slice(0, 10);
-  const unique = new Map();
-  for (const paper of dated.filter((paper) => paper.submittedOnDailyAt.slice(0, 10) === latest)) unique.set(paper.id, paper);
-  const selected = [...unique.values()].sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0)).slice(0, 5).map((paper) => ({
+  const batch = selectLatestCompleteBatch(source, 5);
+  if (batch.selectedDate !== batch.latestDate) warnings.push(`Hugging Face 最新批次 ${batch.latestDate} 尚不完整（${batch.latestCount} 篇），已回退到最近完整批次 ${batch.selectedDate}。`);
+  const selected = batch.papers.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0)).slice(0, 5).map((paper) => ({
     id: paper.id,
     title: text(paper.title, 300),
     summary: text(paper.summary, 1600),
@@ -97,7 +95,7 @@ async function papers() {
   } catch (error) {
     warnings.push(`arXiv 元数据核验失败，保留 Hugging Face 数据：${String(error).slice(0, 160)}`);
   }
-  return { date: latest, selected };
+  return { date: batch.selectedDate, selected };
 }
 
 async function enrichPaperSignals(paperList) {
@@ -189,8 +187,12 @@ async function companies() {
 }
 
 async function rewriteChinese(paperList, companyMap) {
+  if (process.env.ENABLE_LLM_REWRITE !== "1") {
+    warnings.push("未启用外部 LLM 改写，使用确定性来源模板；证据采集不依赖任何模型 API。");
+    return;
+  }
   const key = process.env.GEMINI_API_KEY;
-  if (!key) { warnings.push("未配置 Gemini，使用规则生成论文关键点占位"); return; }
+  if (!key) { warnings.push("已请求 LLM 改写但未配置 Gemini，回退到确定性来源模板。"); return; }
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const source = {
     papers: paperList.map((paper) => ({ id: paper.id, title: paper.title, summary: paper.summary.slice(0, 1000) })),

@@ -1,7 +1,137 @@
+/* eslint-disable @next/next/no-img-element */
 import { listDigests } from "@/lib/digests";
-import type { CompanyItem, Digest, Paper } from "@/lib/types";
+import type { CompanyItem, Paper } from "@/lib/types";
+import Link from "next/link";
+import top3Audit from "../data/top3-latest.json";
+import mechanismRadarAudit from "../data/mechanism-radar-latest.json";
+import sourceQualityAudit from "../data/source-quality-latest.json";
+import formulaAssetsAudit from "../data/formula-assets-latest.json";
 
 const companyOrder = ["OpenAI", "Anthropic", "Google DeepMind", "DeepSeek"];
+
+type EvidencePoint = {
+  topic: string;
+  mechanism_layer: string;
+  statement_zh: string;
+  evidence_ceiling: string;
+  verification_state: string;
+  boundary: string;
+  source_url: string;
+  source_identity: string;
+  formula?: {
+    label_zh: string;
+    alt_zh: string;
+    latex: string;
+    verification_state: "source-exact";
+    source_url: string;
+    source_identity: string;
+    source_excerpt_sha256: string;
+  };
+};
+
+type EvidenceDossier = {
+  rank: number;
+  story_id: string;
+  title: string;
+  primary_section: string;
+  canonical_url: string;
+  selection_score: number;
+  evidence_status: string;
+  key_points: EvidencePoint[];
+  evidence_gaps: string[];
+};
+
+const latestTop3 = top3Audit as unknown as {
+  generated_at: string;
+  status: string;
+  metrics: { dossiers_created: number; key_points_extracted: number; evidence_gaps: number };
+  manual_review_only: boolean;
+  notification_enabled: boolean;
+  publishing_enabled: boolean;
+  dossiers: EvidenceDossier[];
+};
+
+type MechanismRadarCard = {
+  id: string;
+  layer: string;
+  title: string;
+  thesis_zh: string;
+  boundary_zh: string;
+  primary_url: string;
+  current_event: false;
+  attention_level: string;
+  claim_metrics: { source_ready: number; human_review_required: number; evidence_gap: number };
+  source_observation: {
+    observed_days: number;
+    required_days: number;
+    state: "observing" | "degraded" | "await-human-source-review";
+    degraded_source_count: number;
+    review_flag_count: number;
+    human_review_complete: boolean;
+  };
+};
+
+const latestMechanismRadar = mechanismRadarAudit as unknown as {
+  generated_at: string;
+  status: string;
+  current_event_candidates: number;
+  cards: MechanismRadarCard[];
+};
+
+type SourceQualityEntry = {
+  id: string;
+  label: string;
+  lane: "mechanism" | "technology-attention" | "model-compute";
+  quality_role: string;
+  health: { state: "healthy" | "degraded"; source_status: string };
+  observation: { scorecard_consecutive_healthy_days: number; required_days_for_role_review: number; ready_for_human_role_review: boolean };
+  today: { current_window_attributions: number; editorial_exclusion_attributions: number; eligible_candidate_attributions: number; selected_top3_attributions: number };
+  recommendation: string;
+};
+
+const latestSourceQuality = sourceQualityAudit as unknown as {
+  generated_at: string;
+  report_date: string;
+  status: string;
+  summary: {
+    registered_sources: number;
+    healthy_sources: number;
+    degraded_sources: number;
+    editorial_exclusion_endpoint_attributions: number;
+    selected_top3_contributors: number;
+    ready_for_human_role_review: number;
+  };
+  sources: SourceQualityEntry[];
+};
+
+type FormulaAsset = {
+  id: string;
+  scope: "editorial-method" | "research-source-exact";
+  story_id?: string;
+  point_topic?: string;
+  label_zh: string;
+  alt_zh: string;
+  asset_url: string;
+};
+
+const latestFormulaAssets = formulaAssetsAudit as unknown as {
+  generated_at: string;
+  formulas: FormulaAsset[];
+};
+const rankingFormula = latestFormulaAssets.formulas.find((formula) => formula.id === "editorial-ranking-score-v1");
+
+const sectionLabels: Record<string, string> = {
+  "new-model": "新模型",
+  mechanism: "底层机制",
+  "harness-eval": "Harness / Eval",
+  "compute-system": "算力系统",
+};
+
+const sourceLanes = [
+  { label: "论文与机制", count: 21, detail: "arXiv · Hugging Face · Semantic Scholar · 官方论文与代码页" },
+  { label: "模型与算力", count: 16, detail: "官方模型页 · 芯片厂商 · 研究实验室 · GitHub Releases" },
+  { label: "技术与社区", count: 11, detail: "GitHub Trending · Latent Space · Hacker News · 权威科技媒体" },
+];
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -10,6 +140,15 @@ function formatDate(value: string) {
     day: "numeric",
     timeZone: "Asia/Shanghai",
   }).format(new Date(`${value}T00:00:00+08:00`));
+}
+
+function formatReportDate(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Shanghai",
+  }).format(new Date(value));
 }
 
 function paperTitle(paper: Paper) {
@@ -35,13 +174,22 @@ function companySummary(item: CompanyItem) {
 function PaperCard({ paper, rank, maxVotes }: { paper: Paper; rank: number; maxVotes: number }) {
   const voteWidth = Math.max(8, Math.round((paper.upvotes / Math.max(maxVotes, 1)) * 100));
   return (
-    <article className="paper-card">
-      <div className="paper-rank" aria-label={`排名 ${rank}`}>{String(rank).padStart(2, "0")}</div>
-      <div className="paper-body">
-        <div className="paper-kicker">
-          <span>{paper.categories.slice(0, 3).join(" · ") || "AI Research"}</span>
-          <span>{paper.upvotes} HF 赞</span>
-        </div>
+    <details className="paper-card">
+      <summary>
+        <span className="paper-rank" aria-label={`补充排名 ${rank}`}>{String(rank).padStart(2, "0")}</span>
+        <span className="paper-body paper-body-preview">
+          <span className="paper-kicker">
+            <span>{paper.categories.slice(0, 3).join(" · ") || "AI Research"}</span>
+            <span>{paper.upvotes} HF 赞</span>
+          </span>
+          <strong className="paper-preview-title">{paperTitle(paper)}</strong>
+          <span className="paper-preview-reason">{paper.why_zh || "社区热度补充，只在展开后显示详细分析。"}</span>
+          <span className="vote-track" aria-label={`${paper.upvotes} 个 Hugging Face 赞`}><span style={{ width: `${voteWidth}%` }} /></span>
+        </span>
+        <span className="paper-expand" aria-hidden="true" />
+      </summary>
+      <div className="paper-expanded">
+        <div className="paper-kicker"><span>补充雷达 · 非 Top 3</span><span>展开内容不代表入选</span></div>
         <h3>{paperTitle(paper)}</h3>
         {paper.title_zh && paper.title_zh !== paper.title ? <p className="original-title">{paper.title}</p> : null}
         <p className="paper-summary">{paperSummary(paper)}</p>
@@ -77,9 +225,6 @@ function PaperCard({ paper, rank, maxVotes }: { paper: Paper; rank: number; maxV
             {paper.source_signals.slice(0, 4).map((signal) => <span key={signal}>{signal}</span>)}
           </div>
         ) : null}
-        <div className="vote-track" aria-label={`${paper.upvotes} 个 Hugging Face 赞`}>
-          <span style={{ width: `${voteWidth}%` }} />
-        </div>
         <div className="paper-footer">
           <span>{paper.authors.slice(0, 3).join("、")}{paper.authors.length > 3 ? " 等" : ""}</span>
           <nav aria-label={`${paperTitle(paper)} 的来源`}>
@@ -89,7 +234,7 @@ function PaperCard({ paper, rank, maxVotes }: { paper: Paper; rank: number; maxV
           </nav>
         </div>
       </div>
-    </article>
+    </details>
   );
 }
 
@@ -120,98 +265,274 @@ function CompanyCard({ company, items }: { company: string; items: CompanyItem[]
   );
 }
 
-function MetricRail({ digest }: { digest: Digest }) {
-  const totalSignals = Object.values(digest.companies).reduce((count, items) => count + items.length, 0);
-  const totalVotes = digest.papers.reduce((count, paper) => count + paper.upvotes, 0);
+function MetricRail() {
   return (
     <div className="metric-rail" aria-label="本期摘要指标">
       <div>
         <span>TOP</span>
-        <strong>5</strong>
-        <em>热门论文</em>
+        <strong>{latestTop3.metrics.dossiers_created}</strong>
+        <em>代表事件</em>
       </div>
       <div>
-        <span>HF</span>
-        <strong>{totalVotes}</strong>
-        <em>社区赞数</em>
+        <span>POINT</span>
+        <strong>{latestTop3.metrics.key_points_extracted}</strong>
+        <em>机制要点</em>
       </div>
       <div>
-        <span>LAB</span>
-        <strong>{totalSignals}</strong>
-        <em>官方信号</em>
+        <span>ACTION</span>
+        <strong>0</strong>
+        <em>自动发布</em>
       </div>
     </div>
   );
 }
 
-function StatusStrip({ digest }: { digest: Digest }) {
-  const fresh = digest.fetch_events.filter((event) => event.status === "fresh").length;
-  const stale = digest.fetch_events.filter((event) => event.status === "stale-cache").length;
+function Top3StatusStrip() {
   return (
-    <div className="status-strip" aria-label="数据源状态">
-      <span className={stale ? "status-warning" : "status-live"} />
-      <strong>{stale ? `${stale} 个来源使用缓存` : "全部来源已核验"}</strong>
-      <span>{fresh}/{digest.fetch_events.length} 个来源为最新响应</span>
+    <div className="status-strip" aria-label="Top 3 审阅状态">
+      <span className="status-review" />
+      <strong>一手证据已整理，等待人工审阅</strong>
+      <span>{latestTop3.metrics.dossiers_created} 条 / {latestTop3.metrics.key_points_extracted} 个要点</span>
       <span className="status-separator" />
-      <span>生成于 {new Date(digest.generated_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })}</span>
+      <span>更新于 {new Date(latestTop3.generated_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })}</span>
     </div>
+  );
+}
+
+function Top3Card({ dossier }: { dossier: EvidenceDossier }) {
+  return (
+    <article className={`brief-card brief-card-${dossier.primary_section}`}>
+      <div className="brief-rank">
+        <span>NO.</span>
+        <strong>{String(dossier.rank).padStart(2, "0")}</strong>
+        <em>{dossier.selection_score.toFixed(1)}</em>
+      </div>
+      <div className="brief-content">
+        <div className="brief-meta">
+          <span>{sectionLabels[dossier.primary_section] || dossier.primary_section}</span>
+          <span>{dossier.evidence_status === "source-audited-manual-review" ? "来源已审计" : "证据待补"}</span>
+        </div>
+        <h3><a href={dossier.canonical_url} target="_blank" rel="noreferrer">{dossier.title}</a></h3>
+        <div className="mechanism-points">
+          {dossier.key_points.map((point) => {
+            const formula = latestFormulaAssets.formulas.find((item) => item.scope === "research-source-exact" && item.story_id === dossier.story_id && item.point_topic === point.topic);
+            return (
+            <section key={`${dossier.story_id}-${point.topic}`}>
+              <div className="point-heading">
+                <span>{point.mechanism_layer}</span>
+                <strong>{point.topic.replaceAll("-", " ")}</strong>
+              </div>
+              <p>{point.statement_zh}</p>
+              {formula ? <figure className="research-formula">
+                <figcaption>{formula.label_zh} · 一手原式</figcaption>
+                <img src={formula.asset_url} alt={formula.alt_zh} />
+                <small>只显示一手摘录中逐字出现的公式，不由摘要反推。</small>
+              </figure> : null}
+              <div className="point-boundary"><span>证据边界</span>{point.boundary}</div>
+              <div className="point-source">
+                <span>{point.evidence_ceiling}</span>
+                <a href={point.source_url} target="_blank" rel="noreferrer">查看一手来源 ↗</a>
+              </div>
+            </section>
+            );
+          })}
+        </div>
+        <details className="evidence-gaps">
+          <summary>仍缺少的证据 · {dossier.evidence_gaps.length}</summary>
+          <ul>{dossier.evidence_gaps.map((gap) => <li key={gap}>{gap.replaceAll("-", " ")}</li>)}</ul>
+        </details>
+      </div>
+    </article>
+  );
+}
+
+function MechanismRadar() {
+  return (
+    <section className="section-block mechanism-radar-section" id="mechanism-radar">
+      <div className="section-title">
+        <div><p className="eyebrow">MECHANISM WATCH · LONG-RUN</p><h2>底层机制雷达</h2></div>
+        <p>不是当天新闻，也不是语言风格分析。<br />持续核对模型计算路径与证据缺口。</p>
+      </div>
+      <div className="radar-disclosure">
+        <div><span className={latestMechanismRadar.status === "degraded" ? "status-warning" : "status-live"} /><strong>长期尽调 · 本轮新事件 {latestMechanismRadar.current_event_candidates}</strong></div>
+        <p>来源稳定性与 claim 完整性分开显示；达到 7 天也仍需人工来源复核。</p>
+      </div>
+      <div className="mechanism-radar-grid">
+        {latestMechanismRadar.cards.map((card) => (
+          <article className="mechanism-radar-card" key={card.id}>
+            <div className="radar-card-head">
+              <span>{card.layer}</span>
+              <em className={`radar-state radar-state-${card.source_observation.state}`}>
+                {card.source_observation.state === "degraded" ? "来源降级" : `静默 ${card.source_observation.observed_days}/${card.source_observation.required_days}`}
+              </em>
+            </div>
+            <h3><a href={card.primary_url} target="_blank" rel="noreferrer">{card.title}</a></h3>
+            <p className="radar-thesis">{card.thesis_zh}</p>
+            <div className="radar-boundary"><span>不能越过的结论</span><p>{card.boundary_zh}</p></div>
+            <div className="radar-metrics">
+              <span><strong>{card.claim_metrics.source_ready}</strong>窄 claim 可追溯</span>
+              <span><strong>{card.claim_metrics.evidence_gap}</strong>证据缺口</span>
+              <span><strong>{card.attention_level}</strong>关注层</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StudioRail() {
+  return (
+    <aside className="studio-rail" aria-label="页面导航">
+      <a className="rail-logo" href="#overview" aria-label="前沿信号顶部">FS</a>
+      <nav>
+        <a className="active" href="#overview"><span>01</span><em>概览</em></a>
+        <a href="#top3"><span>02</span><em>Top 3</em></a>
+        <a href="#mechanism-radar"><span>03</span><em>机制</em></a>
+        <a href="#sources"><span>04</span><em>来源</em></a>
+        <a href="#papers"><span>05</span><em>论文</em></a>
+        <a href="#companies"><span>06</span><em>实验室</em></a>
+      </nav>
+      <div className="rail-state"><i />静默审阅</div>
+    </aside>
+  );
+}
+
+function SourceArchitecture() {
+  const selectedContributors = latestSourceQuality.sources.filter((source) => source.today.selected_top3_attributions > 0);
+  const noisyObservations = latestSourceQuality.sources
+    .filter((source) => source.today.editorial_exclusion_attributions > 0)
+    .sort((left, right) => right.today.editorial_exclusion_attributions - left.today.editorial_exclusion_attributions)
+    .slice(0, 3);
+  return (
+    <section className="section-block source-section" id="sources">
+      <div className="section-title">
+        <div><p className="eyebrow">SOURCE PIPELINE</p><h2>来源不是越多越好</h2></div>
+        <p>发现与举证分开运行。只有进入 Top 3 的事件，才触发逐论点证据抓取。</p>
+      </div>
+      <div className="pipeline-summary">
+        <div className="pipeline-number"><strong>48</strong><span>注册发现源</span></div>
+        <div className="pipeline-arrow" aria-hidden="true">→</div>
+        <div className="pipeline-number"><strong>10</strong><span>采集器分组</span></div>
+        <div className="pipeline-arrow" aria-hidden="true">→</div>
+        <div className="pipeline-number featured"><strong>3</strong><span>最多入选</span></div>
+        <div className="pipeline-arrow" aria-hidden="true">→</div>
+        <div className="pipeline-number"><strong>64</strong><span>按需证据端点</span></div>
+      </div>
+      <div className="source-lanes">
+        {sourceLanes.map((lane) => (
+          <article key={lane.label}>
+            <div><span>{String(lane.count).padStart(2, "0")}</span><i /></div>
+            <h3>{lane.label}</h3>
+            <p>{lane.detail}</p>
+          </article>
+        ))}
+      </div>
+      <div className="source-quality-console">
+        <div className="source-quality-head">
+          <div><span className={latestSourceQuality.status === "ok" ? "status-live" : "status-warning"} /><strong>当日来源质量账本</strong></div>
+          <p>单日只记录，不自动删源；连续 7 个自然日后才进入人工角色复核。</p>
+        </div>
+        <div className="source-quality-metrics">
+          <div><strong>{latestSourceQuality.summary.healthy_sources}/{latestSourceQuality.summary.registered_sources}</strong><span>当日健康</span></div>
+          <div><strong>{latestSourceQuality.summary.selected_top3_contributors}</strong><span>Top 贡献源</span></div>
+          <div><strong>{latestSourceQuality.summary.editorial_exclusion_endpoint_attributions}</strong><span>排除归因</span></div>
+          <div><strong>{latestSourceQuality.summary.ready_for_human_role_review}</strong><span>可人审调级</span></div>
+        </div>
+        <div className="source-quality-columns">
+          <section>
+            <span>今日高信号贡献</span>
+            {selectedContributors.map((source) => <div key={source.id}><strong>{source.label}</strong><em>{source.quality_role.replaceAll("-", " ")} · Top {source.today.selected_top3_attributions}</em></div>)}
+          </section>
+          <section>
+            <span>噪声观察（不代表删源）</span>
+            {noisyObservations.map((source) => <div key={source.id}><strong>{source.label}</strong><em>排除归因 {source.today.editorial_exclusion_attributions} · 观察 {source.observation.scorecard_consecutive_healthy_days}/7</em></div>)}
+          </section>
+        </div>
+      </div>
+      <div className="rule-console">
+        <div><span>准入</span><code>一手身份 + 明确技术增量 + 48h 时效</code></div>
+        <div><span>排序</span><code>I(0–2) + Δtech(0–3) + Artifact(0–2) + Heat(0–2) + Freshness(0–1)</code></div>
+        <div><span>输出</span><code>score ≥ 6 · 每类最多 1 条 · 不足则留空</code></div>
+      </div>
+    </section>
   );
 }
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const [{ date }, digests] = await Promise.all([searchParams, listDigests()]);
   const digest = digests.find((item) => item.date === date) ?? digests[0];
-  const maxVotes = Math.max(...digest.papers.map((paper) => paper.upvotes), 1);
+  const papers = digest?.papers || [];
+  const maxVotes = Math.max(...papers.map((paper) => paper.upvotes), 1);
 
   return (
-    <main>
-      <header className="site-header">
-        <a className="brand" href="/" aria-label="前沿信号首页">
-          <span className="brand-mark">F</span>
-          <span><strong>前沿信号</strong><small>FRONTIER SIGNALS</small></span>
-        </a>
-        <div className="header-note">每日 AI 研究筛选与官方信号追踪</div>
-      </header>
+    <main className="studio-shell">
+      <StudioRail />
+      <div className="studio-main">
+        <header className="site-header">
+          <Link className="brand" href="/" aria-label="前沿信号首页">
+            <span><strong>AI Signal Studio</strong><small>前沿信号 · DAILY RESEARCH CONSOLE</small></span>
+          </Link>
+          <nav className="header-actions" aria-label="快捷导航">
+            <a href="#sources">48 个发现源</a>
+            <a href="#top3">今日 Top {latestTop3.dossiers.length}</a>
+            <span><i />人工审阅模式</span>
+          </nav>
+        </header>
 
-      <div className="page-shell">
+        <div className="page-shell">
         <aside className="archive-panel">
           <p className="eyebrow">DAILY ARCHIVE</p>
           <h2>日报归档</h2>
-          <nav aria-label="日报日期">
-            {digests.map((item, index) => (
-              <a className={item.date === digest.date ? "active" : ""} href={`/?date=${item.date}`} key={item.date}>
-                <span>{formatDate(item.date)}</span>
-                {index === 0 ? <em>最新</em> : null}
-              </a>
-            ))}
-          </nav>
+          <nav aria-label="日报日期"><Link className="active" href="/"><span>{formatReportDate(latestTop3.generated_at)}</span><em>最新</em></Link></nav>
+          <p className="archive-batch">论文热榜批次：{formatDate(digest.date)}</p>
           <div className="method-note">
             <span>筛选公式</span>
-            <div className="formula" aria-label="论文分数等于 Hugging Face 赞数">
-              S<sub>paper</sub> = U<sub>HF</sub>
+            <div className="formula">
+              {rankingFormula ? <img src={rankingFormula.asset_url} alt={rankingFormula.alt_zh} /> : null}
             </div>
-            <p>同一完整日榜内按 Hugging Face 社区赞数排序，arXiv 仅用于元数据交叉核验。</p>
+            <p>一手身份与技术增量决定准入，社区热度只负责排序；入选后才拉取 claim-specific 证据。</p>
           </div>
         </aside>
 
         <div className="content-column">
-          <section className="hero">
+          <section className="hero" id="overview">
             <div>
-              <p className="eyebrow">AI RESEARCH DAILY · {digest.date}</p>
-              <h1>每日 AI 研究情报台</h1>
-              <p className="hero-copy">从 Hugging Face 热度、arXiv 元数据和前沿实验室官方渠道中，提炼当天最值得进入公众号排版的研究信号。</p>
-              <StatusStrip digest={digest} />
+              <p className="eyebrow">DAILY MECHANISM BRIEF · {formatReportDate(latestTop3.generated_at)}</p>
+              <h1>今天真正值得理解的<br /><span>{latestTop3.metrics.dossiers_created} 个 AI 技术信号</span></h1>
+              <p className="hero-copy">新模型、芯片与算力、底层机制、Harness / Eval 在同一个候选池竞争。社区热度负责发现，一手证据决定结论能写到哪里。</p>
+              <div className="command-bar">
+                <div><span className="command-dot" /><strong>48 个注册源完成发现</strong><small>→ 已收敛为 {latestTop3.metrics.dossiers_created} 条审阅候选</small></div>
+                <a href="#top3">打开今日简报 <span>↗</span></a>
+              </div>
+              <Top3StatusStrip />
             </div>
-            <MetricRail digest={digest} />
+            <MetricRail />
           </section>
+
+          <section className="section-block top3-section" id="top3">
+            <div className="section-title">
+              <div><p className="eyebrow">TODAY&apos;S TOP SIGNALS</p><h2>今日 {latestTop3.dossiers.length} 条</h2></div>
+              <p>最多三条，不足不补位。每条都保留<br />机制层、证据上限和反推边界。</p>
+            </div>
+            <div className="brief-list">
+              {latestTop3.dossiers.length
+                ? latestTop3.dossiers.map((dossier) => <Top3Card key={dossier.story_id} dossier={dossier} />)
+                : <div className="brief-empty"><strong>今天没有达到门槛的代表事件</strong><p>系统不会用普通更新或单一热搜硬凑 Top 3。</p></div>}
+            </div>
+          </section>
+
+          <MechanismRadar />
+
+          <SourceArchitecture />
 
           <section className="section-block" id="papers">
             <div className="section-title">
-              <div><p className="eyebrow">TODAY&apos;S TOP FIVE</p><h2>热门论文</h2></div>
-              <p>批次日期 {formatDate(digest.date)}<br />热度来自社区投票，不代表引用量。</p>
+              <div><p className="eyebrow">SECONDARY PAPER RADAR</p><h2>未入选论文补充</h2></div>
+              <p>默认折叠，不与 Top 3 混排。<br />批次 {formatDate(digest.date)} · 热度不等于证据。</p>
             </div>
             <div className="paper-list">
-              {digest.papers.map((paper, index) => (
+              {papers.map((paper, index) => (
                 <PaperCard key={paper.id} paper={paper} rank={index + 1} maxVotes={maxVotes} />
               ))}
             </div>
@@ -238,6 +559,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
             <p>数据源：Hugging Face、arXiv、OpenAI、Anthropic、Google DeepMind、DeepSeek。DeepSeek 仓库更新时间仅作为工程方向信号。</p>
           </footer>
         </div>
+      </div>
       </div>
     </main>
   );

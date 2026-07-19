@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+node automation/check-no-secrets.mjs --tracked
+node automation/check-no-secrets.mjs --history

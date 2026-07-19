@@ -1,0 +1,74 @@
+name: Deep source diligence (silent)
+
+on:
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deep-source-diligence
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Restore bounded audit history
+        uses: actions/cache@v4
+        with:
+          path: |
+            work/mechanism-watch/audit.json
+            work/mechanism-watch/cache
+            work/model-compute-source-probe/audit.json
+            work/model-compute-source-probe/cache
+            work/candidate-source-probe/audit.json
+            work/candidate-source-probe/cache
+            work/tech-discovery-probe/audit.json
+            work/tech-discovery-probe/cache
+            work/evidence-gap-scout/audit.json
+            work/evidence-gap-scout/cache
+          key: daily-intelligence-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            daily-intelligence-${{ runner.os }}-
+      - name: Refresh source snapshots without publishing
+        run: |
+          npm run gate:mechanisms
+          npm run gate:model-compute-sources
+          npm run gate:tech-discovery
+          npm run gate:source-candidates
+      - name: Build source contracts and promotion-readiness reports
+        run: |
+          npm run gate:source-diligence
+          npm run gate:semantic-review
+          npm run gate:source-readiness
+          npm run scout:evidence-gaps
+          npm run verify:evidence-scout
+      - name: Upload silent diligence evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-source-diligence
+          path: |
+            work/candidate-source-probe/audit.json
+            work/candidate-source-probe/review.md
+            work/source-diligence/coverage.json
+            work/source-diligence/review.md
+            work/semantic-review-dossiers/dossier.json
+            work/semantic-review-dossiers/review.md
+            work/source-promotion-readiness/readiness.json
+            work/source-promotion-readiness/readiness.md
+            work/evidence-gap-scout/audit.json
+            work/evidence-gap-scout/review.md
+          if-no-files-found: error
+          retention-days: 30

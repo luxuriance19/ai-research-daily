@@ -1,4 +1,4 @@
-name: Daily AI digest
+name: Manual AI digest verification
 
 on:
   workflow_dispatch:
@@ -11,9 +11,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  verify-static:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 35
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,9 +23,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node automation/run-daily.mjs
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SITE_INGEST_URL: ${{ secrets.SITE_INGEST_URL }}
-          SITE_INGEST_TOKEN: ${{ secrets.SITE_INGEST_TOKEN }}
-          OAI_SITES_BYPASS_TOKEN: ${{ secrets.OAI_SITES_BYPASS_TOKEN }}
+      - run: npm run daily:fast
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manually-verified-ai-digest
+          path: |
+            public-pages
+            work/unified-top3-replay/audit.json
+            work/top3-evidence-dossier/audit.json
+            work/fast-daily/run.json
+          if-no-files-found: error
+          retention-days: 14
