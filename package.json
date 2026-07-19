@@ -32,7 +32,7 @@
     "dossier:top3-evidence": "node automation/top3-evidence-dossier.mjs",
     "gate:top3-evidence": "node automation/run-and-verify-top3-evidence-dossier.mjs",
     "sync:top3-site": "node automation/top3-site-data.mjs",
-    "sync:formula-assets": "node automation/formula-site-data.mjs && python3 ../scripts/render_formula_assets.py --manifest data/formula-assets-latest.json --output-dir public/formulas",
+    "sync:formula-assets": "node automation/formula-site-data.mjs && python3 scripts/render_formula_assets.py --manifest data/formula-assets-latest.json --output-dir public/formulas",
     "sync:mechanism-radar-site": "node automation/mechanism-radar-site-data.mjs",
     "sync:source-quality-site": "node automation/source-quality-site-data.mjs",
     "sync:source-role-review": "node automation/source-role-review.mjs",

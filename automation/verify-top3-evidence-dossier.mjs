@@ -80,8 +80,14 @@ async function main() {
     modelCompute: resolve(process.env.TOP3_EVIDENCE_MODEL_COMPUTE_PATH || "work/model-compute-source-probe/audit.json"),
     semanticReview: resolve(process.env.TOP3_EVIDENCE_SEMANTIC_REVIEW_PATH || "work/semantic-review-dossiers/dossier.json"),
   };
+  const readOptionalBody = async (path) => {
+    try { return await readFile(path, "utf8"); } catch (error) {
+      if (error?.code === "ENOENT") return null;
+      throw error;
+    }
+  };
   const [auditBody, top3Body, techBody, mechanismBody, candidateBody, modelComputeBody, semanticReviewBody] = await Promise.all([
-    readFile(auditPath, "utf8"), readFile(paths.top3, "utf8"), readFile(paths.tech, "utf8"), readFile(paths.mechanism, "utf8"), readFile(paths.candidate, "utf8"), readFile(paths.modelCompute, "utf8"), readFile(paths.semanticReview, "utf8"),
+    readFile(auditPath, "utf8"), readFile(paths.top3, "utf8"), readFile(paths.tech, "utf8"), readFile(paths.mechanism, "utf8"), readOptionalBody(paths.candidate), readFile(paths.modelCompute, "utf8"), readOptionalBody(paths.semanticReview),
   ]);
   const result = verifyTop3EvidenceDossier(JSON.parse(auditBody), { top3Body, techBody, mechanismBody, candidateBody, modelComputeBody, semanticReviewBody });
   if (!result.ok) {

@@ -166,6 +166,36 @@ test("selected K3 and Inspect release become detailed claim-bounded dossiers", (
   assert.ok(result.errors.some((error) => error.includes("claim crossed review boundary")));
 });
 
+test("cold critical path builds Harness evidence from the same-run tech release snapshot", () => {
+  const values = fixtures();
+  const inspect = values.top3Audit.selected_top3[1];
+  const release = values.candidateAudit.source_events[0].snapshot.releases[0];
+  values.top3Audit.selected_top3 = [inspect];
+  values.candidateAudit = null;
+  values.techAudit.source_events = [{
+    source_id: "official-github-releases-existing-snapshots",
+    status: "fresh",
+    items: [{
+      canonical_url: inspect.canonical_url,
+      summary_for_discovery_only: release.body_excerpt,
+      primary_identity_hint: {
+        repository: release.repository,
+        release_id: release.id,
+        tag_name: release.tag_name,
+        body_sha256: release.body_sha256,
+        body_excerpt_sha256: release.body_excerpt_sha256,
+        target_commitish: release.target_commitish,
+        immutable: false,
+      },
+    }],
+  }];
+  const audit = buildTop3EvidenceDossier({ ...values, generatedAt: NOW });
+  assert.equal(audit.status, "review-ready");
+  assert.equal(audit.input_snapshots.candidate_fingerprint, null);
+  assert.ok(audit.dossiers[0].key_points.some((claim) => claim.topic === "scorer-semantics-sciknoweval"));
+  assert.ok(audit.dossiers[0].evidence_gaps.includes("release-tag-commit-not-resolved"));
+});
+
 test("an unfamiliar official model gets a generic source-excerpt profile instead of a fabricated mechanism analysis", () => {
   const values = fixtures();
   const item = {
