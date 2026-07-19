@@ -959,6 +959,15 @@ function assertAllowedDetailUrl(value) {
   return url.href;
 }
 
+export function isAllowedOfficialDetailUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ALLOWED_DETAIL_HOSTS.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 async function fetchOfficialDetail(item, { cacheDir, fetchImpl, now }) {
   const url = assertAllowedDetailUrl(item.canonical_url);
   const cachePath = resolve(cacheDir, `${sha256(url)}.json`);
@@ -1048,7 +1057,12 @@ export async function runTop3EvidenceDossier({
   const modelComputeAudit = JSON.parse(modelComputeBody);
   const semanticReviewAudit = semanticReviewBody ? JSON.parse(semanticReviewBody) : null;
   const observedAt = now || new Date();
-  const detailItems = array(top3Audit.selected_top3).filter((item) => ["new-model", "compute-system"].includes(item.primary_section) && !/github\.com|arxiv\.org/i.test(item.canonical_url));
+  // Only first-party pages may enter the official-detail evidence lane. Trusted
+  // analysis sources can still be selected, but they must not be relabelled as
+  // official evidence or abort the entire daily run when their host differs.
+  const detailItems = array(top3Audit.selected_top3).filter((item) =>
+    ["new-model", "compute-system"].includes(item.primary_section)
+    && isAllowedOfficialDetailUrl(item.canonical_url));
   const officialSnapshots = [];
   for (const item of detailItems.slice(0, TOP3_EVIDENCE_POLICY.maximum_detail_requests)) {
     officialSnapshots.push(await fetchOfficialDetail(item, { cacheDir, fetchImpl, now: observedAt }));

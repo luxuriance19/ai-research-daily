@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   buildTop3EvidenceDossier,
+  isAllowedOfficialDetailUrl,
   normalizeOfficialHtml,
 } from "../automation/top3-evidence-dossier.mjs";
 import { runAndVerifyTop3Evidence } from "../automation/run-and-verify-top3-evidence-dossier.mjs";
@@ -130,6 +131,12 @@ function semanticFixture() {
 test("official HTML normalization drops executable and diagram content while preserving decoded text", () => {
   const text = normalizeOfficialHtml("<script>secret()</script><svg><text>diagram</text></svg><p>K3 &amp; AttnRes &#x27;max&#x27;</p>");
   assert.equal(text, "K3 & AttnRes 'max'");
+});
+
+test("only first-party hosts enter the official-detail evidence lane", () => {
+  assert.equal(isAllowedOfficialDetailUrl("https://www.kimi.com/blog/kimi-k3"), true);
+  assert.equal(isAllowedOfficialDetailUrl("https://simonwillison.net/2026/Jul/19/claude-code-in-bun-in-rust"), false);
+  assert.equal(isAllowedOfficialDetailUrl("not-a-url"), false);
 });
 
 test("selected K3 and Inspect release become detailed claim-bounded dossiers", () => {
