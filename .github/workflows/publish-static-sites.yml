@@ -57,6 +57,16 @@ jobs:
         env:
           OUTPUT_PATH: data/latest.json
           SKIP_INGEST: "1"
+      - name: Reject credentials in generated publish artifacts
+        run: >-
+          node automation/check-no-secrets.mjs --paths
+          public-pages
+          work/unified-top3-replay
+          work/top3-evidence-dossier
+          work/fast-daily
+          data/source-quality-latest.json
+          data/source-role-review-latest.json
+          data/source-role-review-latest.md
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public-pages

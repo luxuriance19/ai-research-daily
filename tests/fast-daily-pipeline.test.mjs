@@ -177,5 +177,9 @@ test("scheduled static workflow preserves the source ledger and dated archives a
   assert.match(workflow, /data\/source-role-review-latest\.md/);
   assert.match(workflow, /public-pages\/archive/);
   assert.match(workflow, /npm run daily:fast/);
+  assert.match(workflow, /check-no-secrets\.mjs --paths/);
+  assert.match(workflow, /public-pages/);
+  assert.ok(workflow.indexOf("check-no-secrets.mjs --paths") > workflow.indexOf("npm run daily:fast"));
+  assert.ok(workflow.indexOf("check-no-secrets.mjs --paths") < workflow.indexOf("actions/upload-pages-artifact@v3"));
   assert.doesNotMatch(workflow, /GEMINI|OAI_SITES|SITE_INGEST|OPENAI_API|WECHAT/i);
 });
