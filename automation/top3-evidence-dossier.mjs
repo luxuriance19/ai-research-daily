@@ -302,7 +302,7 @@ function buildGenericModelDossier(item, snapshot) {
   };
 }
 
-function releaseForItem(item, candidateAudit) {
+function releaseForItem(item, candidateAudit, techAudit) {
   const techSourceId = array(item.source_ids).find((sourceId) => sourceId === "official-github-releases-existing-snapshots");
   if (!techSourceId) return null;
   const tag = item.canonical_url.match(/\/releases\/tag\/([^/?#]+)/)?.[1];
@@ -313,11 +313,43 @@ function releaseForItem(item, candidateAudit) {
       if (String(release.repository || "").toLowerCase() === repository && release.tag_name === tag) return { event, release };
     }
   }
+  for (const event of array(techAudit?.source_events)) {
+    if (event?.source_id !== techSourceId) continue;
+    const techItem = array(event?.items).find((record) => record?.canonical_url === item.canonical_url);
+    const hint = techItem?.primary_identity_hint;
+    if (!techItem || !hint || String(hint.repository || "").toLowerCase() !== repository || hint.tag_name !== tag) continue;
+    const bodyExcerpt = String(techItem.summary_for_discovery_only || "");
+    const snapshotIdentity = sha256(JSON.stringify({
+      repository: hint.repository,
+      release_id: hint.release_id,
+      tag_name: hint.tag_name,
+      body_sha256: hint.body_sha256,
+      body_excerpt_sha256: hint.body_excerpt_sha256,
+      target_commitish: hint.target_commitish,
+      immutable: hint.immutable === true,
+    }));
+    return {
+      event,
+      release: {
+        id: hint.release_id,
+        repository: hint.repository,
+        tag_name: hint.tag_name,
+        release_snapshot_sha256: snapshotIdentity,
+        body_sha256: hint.body_sha256,
+        body_excerpt: bodyExcerpt,
+        body_excerpt_sha256: hint.body_excerpt_sha256,
+        body_excerpt_truncated: bodyExcerpt.length >= 1000,
+        immutable: hint.immutable === true,
+        target_commitish: hint.target_commitish,
+        tag_commit_resolution: "not-resolved-in-critical-path",
+      },
+    };
+  }
   return null;
 }
 
-function buildHarnessDossier(item, candidateAudit) {
-  const match = releaseForItem(item, candidateAudit);
+function buildHarnessDossier(item, candidateAudit, techAudit) {
+  const match = releaseForItem(item, candidateAudit, techAudit);
   if (!match) return {
     profile: "versioned-harness-release",
     evidence_status: "missing-claim-specific-release-snapshot",
@@ -812,7 +844,7 @@ export function buildTop3EvidenceDossier({
           evidence_gaps: ["model-specific-claim-profile-not-yet-reviewed"],
         };
     } else if (item.primary_section === "harness-eval") {
-      detail = buildHarnessDossier(item, candidateAudit);
+      detail = buildHarnessDossier(item, candidateAudit, techAudit);
     } else if (item.primary_section === "mechanism") {
       detail = buildMechanismDossier(item, mechanismAudit, semanticReviewAudit);
     } else {
@@ -837,7 +869,7 @@ export function buildTop3EvidenceDossier({
     top3_fingerprint: inputFingerprints.top3 || sha256(JSON.stringify(top3Audit)),
     tech_fingerprint: inputFingerprints.tech || sha256(JSON.stringify(techAudit)),
     mechanism_fingerprint: inputFingerprints.mechanism || sha256(JSON.stringify(mechanismAudit)),
-    candidate_fingerprint: inputFingerprints.candidate || sha256(JSON.stringify(candidateAudit)),
+    candidate_fingerprint: candidateAudit ? inputFingerprints.candidate || sha256(JSON.stringify(candidateAudit)) : null,
     model_compute_fingerprint: modelComputeAudit ? inputFingerprints.modelCompute || sha256(JSON.stringify(modelComputeAudit)) : null,
     semantic_review_fingerprint: semanticReviewAudit ? inputFingerprints.semanticReview || sha256(JSON.stringify(semanticReviewAudit)) : null,
   };
@@ -1000,15 +1032,21 @@ export async function runTop3EvidenceDossier({
   fetchImpl = fetch,
   now,
 } = {}) {
+  const readOptionalBody = async (path) => {
+    try { return await readFile(path, "utf8"); } catch (error) {
+      if (error?.code === "ENOENT") return null;
+      throw error;
+    }
+  };
   const [top3Body, techBody, mechanismBody, candidateBody, modelComputeBody, semanticReviewBody] = await Promise.all([
-    readFile(top3Path, "utf8"), readFile(techPath, "utf8"), readFile(mechanismPath, "utf8"), readFile(candidatePath, "utf8"), readFile(modelComputePath, "utf8"), readFile(semanticReviewPath, "utf8"),
+    readFile(top3Path, "utf8"), readFile(techPath, "utf8"), readFile(mechanismPath, "utf8"), readOptionalBody(candidatePath), readFile(modelComputePath, "utf8"), readOptionalBody(semanticReviewPath),
   ]);
   const top3Audit = JSON.parse(top3Body);
   const techAudit = JSON.parse(techBody);
   const mechanismAudit = JSON.parse(mechanismBody);
-  const candidateAudit = JSON.parse(candidateBody);
+  const candidateAudit = candidateBody ? JSON.parse(candidateBody) : null;
   const modelComputeAudit = JSON.parse(modelComputeBody);
-  const semanticReviewAudit = JSON.parse(semanticReviewBody);
+  const semanticReviewAudit = semanticReviewBody ? JSON.parse(semanticReviewBody) : null;
   const observedAt = now || new Date();
   const detailItems = array(top3Audit.selected_top3).filter((item) => ["new-model", "compute-system"].includes(item.primary_section) && !/github\.com|arxiv\.org/i.test(item.canonical_url));
   const officialSnapshots = [];
@@ -1019,7 +1057,7 @@ export async function runTop3EvidenceDossier({
     top3Audit, techAudit, mechanismAudit, candidateAudit, modelComputeAudit, semanticReviewAudit, officialSnapshots,
     generatedAt: observedAt.toISOString(),
     inputFingerprints: {
-      top3: sha256(top3Body), tech: sha256(techBody), mechanism: sha256(mechanismBody), candidate: sha256(candidateBody), modelCompute: sha256(modelComputeBody), semanticReview: sha256(semanticReviewBody),
+      top3: sha256(top3Body), tech: sha256(techBody), mechanism: sha256(mechanismBody), candidate: candidateBody ? sha256(candidateBody) : null, modelCompute: sha256(modelComputeBody), semanticReview: semanticReviewBody ? sha256(semanticReviewBody) : null,
     },
   });
   await atomicWrite(outputPath, `${JSON.stringify(audit, null, 2)}\n`);
