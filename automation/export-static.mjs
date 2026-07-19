@@ -83,10 +83,10 @@ function storyHtml(story, featured = false, assetPrefix = "./") {
     <h3>${esc(story.title)}</h3>
     ${story.original_title && story.original_title !== story.title ? `<p class="original-title">${esc(story.original_title)}</p>` : ""}
     <p class="story-summary">${esc(story.summary)}</p>
-    <div class="story-why"><strong>为什么值得看</strong><p>${esc(story.why_it_matters)}</p></div>
+    <div class="story-why"><strong>${esc(story.angle_label || "先看重点")}</strong><p>${esc(story.why_it_matters)}</p></div>
     <ul class="story-points">${list(story.key_points).map((point) => `<li>${esc(point)}</li>`).join("")}</ul>
     ${formula ? `<figure class="story-formula"><figcaption>${esc(formula.label)}</figcaption><img src="${esc(`${assetPrefix}formulas/${formula.asset_file}`)}" alt="${esc(formula.alt)}"></figure>` : ""}
-    <div class="story-caveat"><strong>需要保留的边界</strong><p>${esc(story.caveat)}</p></div>
+    <div class="story-caveat"><strong>${esc(story.caveat_label || "还没确认")}</strong><p>${esc(story.caveat)}</p></div>
     <nav class="story-sources" aria-label="${esc(story.title)} 的一手来源">${list(story.sources).map((source) => `<a href="${esc(source.url)}" target="_blank" rel="noreferrer">${esc(source.label)} ↗</a>`).join("")}</nav>
   </article>`;
 }
@@ -98,7 +98,7 @@ function sectionHtml(section, assetPrefix = "./") {
     ${section.status_note ? `<p class="section-status">${esc(section.status_note)}</p>` : ""}
     ${stories.length
       ? `<div class="story-list">${stories.map((story, index) => storyHtml(story, index === 0, assetPrefix)).join("")}</div>`
-      : `<div class="honest-empty"><span>本期留空</span><p>${esc(section.empty_message)}</p></div>`}
+      : `<div class="honest-empty"><span>今天无大事</span><p>${esc(section.empty_message)}</p></div>`}
   </section>`;
 }
 
@@ -132,13 +132,13 @@ function render(editorial, { archiveEntries = [], assetPrefix = "./", homeHref =
         <p class="edition-date">${esc(formatDate(editorial.date))} · 第 ${esc(editorial.date.replaceAll("-", ""))} 期</p>
         <h1>${esc(editorial.title)}</h1>
         <p class="hero-deck">${esc(editorial.deck)}</p>
-        <div class="today-judgment"><span>今日判断</span><p>${esc(editorial.lead)}</p></div>
+        <div class="today-judgment"><span>编辑手记</span><p>${esc(editorial.lead)}</p></div>
         <div class="section-index" aria-label="本期栏目目录">${list(editorial.sections).map((section) => `<a href="#${esc(section.id)}"><span>${esc(section.number)}</span><strong>${esc(section.title)}</strong><em>${list(section.stories).length ? `${list(section.stories).length} 条` : "留空"}</em></a>`).join("")}</div>
       </section>
       ${list(editorial.sections).map((section) => sectionHtml(section, assetPrefix)).join("")}
       <footer class="daily-footer">
         <details><summary>编辑说明与来源边界</summary><p>论文热度批次为 ${esc(editorial.reading_notes?.paper_batch)}。社区热度只帮助发现，不替代官方发布、论文、代码或版本记录。</p>${editorial.reading_notes?.omitted_evaluation_patch ? `<p>${esc(editorial.reading_notes.note)}</p>` : ""}<nav class="archive-links" aria-label="日报归档">${archiveLinks}</nav></details>
-        <p>自动采集，人工可读；没有重要更新时宁可留空。</p>
+        <p>资料由程序汇集，正文按证据整理。没到新闻门槛的内容不占版面。</p>
       </footer>
     </article>
   </main>
@@ -152,9 +152,9 @@ function inlineStory(story) {
     <h3 style="margin:0;color:#171916;font-size:22px;line-height:1.45;">${esc(story.title)}</h3>
     ${story.original_title && story.original_title !== story.title ? `<p style="margin:8px 0 0;color:#777b74;font-size:11px;line-height:1.5;">${esc(story.original_title)}</p>` : ""}
     <p style="margin:16px 0;color:#4c514b;font-size:16px;line-height:1.9;">${esc(story.summary)}</p>
-    <blockquote style="margin:16px 0;padding:14px 16px;border-left:4px solid #cc5a2d;background:#f3efe6;color:#373b36;font-size:14px;line-height:1.75;"><strong>为什么值得看：</strong>${esc(story.why_it_matters)}</blockquote>
+    <blockquote style="margin:16px 0;padding:14px 16px;border-left:4px solid #cc5a2d;background:#f3efe6;color:#373b36;font-size:14px;line-height:1.75;"><strong>${esc(story.angle_label || "先看重点")}：</strong>${esc(story.why_it_matters)}</blockquote>
     <ol style="margin:18px 0;padding-left:22px;color:#262925;font-size:15px;line-height:1.85;">${list(story.key_points).map((point) => `<li style="margin:8px 0;">${esc(point)}</li>`).join("")}</ol>
-    <p style="margin:16px 0;padding:12px 14px;background:#f8f6f0;color:#5a5f58;font-size:13px;line-height:1.75;"><strong>需要保留的边界：</strong>${esc(story.caveat)}</p>
+    <p style="margin:16px 0;padding:12px 14px;background:#f8f6f0;color:#5a5f58;font-size:13px;line-height:1.75;"><strong>${esc(story.caveat_label || "还没确认")}：</strong>${esc(story.caveat)}</p>
     <p style="margin:12px 0 0;font-size:12px;">${list(story.sources).map((source) => `<a style="margin-right:14px;color:#294c9b;" href="${esc(source.url)}">${esc(source.label)} ↗</a>`).join("")}</p>
   </section>`;
 }
@@ -164,9 +164,9 @@ function renderWechat(editorial) {
     <p style="margin:0 0 14px;color:#294c9b;font-size:12px;font-weight:700;letter-spacing:.08em;">${esc(formatDate(editorial.date))}</p>
     <h1 style="margin:0;color:#171916;font-family:Georgia,'Songti SC',serif;font-size:36px;line-height:1.2;">${esc(editorial.title)}</h1>
     <p style="margin:18px 0;color:#4c514b;font-size:16px;line-height:1.85;">${esc(editorial.deck)}</p>
-    <blockquote style="margin:24px 0;padding:18px;border-left:5px solid #cc5a2d;background:#f3efe6;color:#252824;font-size:17px;line-height:1.8;"><strong style="display:block;margin-bottom:6px;color:#cc5a2d;font-size:12px;">今日判断</strong>${esc(editorial.lead)}</blockquote>
+    <blockquote style="margin:24px 0;padding:18px;border-left:5px solid #cc5a2d;background:#f3efe6;color:#252824;font-size:17px;line-height:1.8;"><strong style="display:block;margin-bottom:6px;color:#cc5a2d;font-size:12px;">编辑手记</strong>${esc(editorial.lead)}</blockquote>
     ${list(editorial.sections).map((section) => `<section style="margin:36px 0 0;"><p style="margin:0;color:#294c9b;font-size:13px;font-weight:700;">${esc(section.number)}</p><h2 style="margin:6px 0 4px;color:#171916;font-size:27px;line-height:1.4;">${esc(section.title)}</h2><p style="margin:0 0 14px;color:#777b74;font-size:13px;line-height:1.7;">${esc(section.description)}</p>${section.status_note ? `<p style="padding:12px 14px;background:#e9eefb;color:#334466;font-size:13px;line-height:1.7;">${esc(section.status_note)}</p>` : ""}${list(section.stories).length ? list(section.stories).map(inlineStory).join("") : `<p style="padding:18px;border:1px dashed #aaa393;background:#f6f2e9;color:#4c514b;font-size:15px;line-height:1.75;">${esc(section.empty_message)}</p>`}</section>`).join("")}
-    <p style="margin:34px 0 0;padding-top:18px;border-top:1px solid #d8d2c5;color:#777b74;font-size:12px;line-height:1.8;">自动采集，人工可读；没有重要更新时宁可留空。本页是公众号排版预览，不会自动发送。</p>
+    <p style="margin:34px 0 0;padding-top:18px;border-top:1px solid #d8d2c5;color:#777b74;font-size:12px;line-height:1.8;">资料由程序汇集，正文按证据整理。没到新闻门槛的内容不占版面。本页是公众号排版预览，不会自动发送。</p>
   </section></body></html>`;
 }
 

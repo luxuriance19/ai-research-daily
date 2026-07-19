@@ -20,8 +20,10 @@ test("static site renders the four reader-facing news sections", async () => {
     assert.match(html, /<title>AI 前沿日报｜模型、芯片、底层研究与 Harness<\/title>/);
     for (const heading of ["前沿模型公司", "芯片与算力", "模型规则与底层分析", "Harness 进展"]) assert.match(html, new RegExp(heading));
     assert.match(html, /<article class="news-story/);
-    assert.match(html, /为什么值得看/);
-    assert.match(html, /需要保留的边界/);
+    assert.match(html, /编辑手记/);
+    assert.match(html, /story-why/);
+    assert.match(html, /story-caveat/);
+    assert.doesNotMatch(html, /为什么值得看|需要保留的边界|本期最值得注意的变化，不是/);
     assert.doesNotMatch(html, /UKGovernmentBEIS\/inspect_evals v0\.15\.0/);
     assert.doesNotMatch(html, /48 个注册源|来源不是越多越好|静默 0\/7|T4-official|A0/);
     assert.doesNotMatch(html, /MathJax|katex|<script/i);
@@ -79,7 +81,7 @@ test("empty editorial sections stay explicit and archives remain additive", asyn
     const first = spawnSync(process.execPath, ["automation/export-static.mjs", digestPath, output], { cwd: process.cwd(), encoding: "utf8", env });
     assert.equal(first.status, 0, first.stderr);
     const html = await readFile(path.join(output, "index.html"), "utf8");
-    assert.equal((html.match(/本期留空/g) || []).length, 4);
+    assert.equal((html.match(/今天无大事/g) || []).length, 4);
 
     editorial.date = "2026-07-20";
     editorial.generated_at = "2026-07-19T23:30:00.000Z";

@@ -18,11 +18,12 @@ test("renders a reader-first four-section AI daily", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>AI 前沿日报｜模型、芯片、底层研究与 Harness<\/title>/i);
-  assert.match(html, /今日判断/);
+  assert.match(html, /编辑手记/);
   for (const heading of ["前沿模型公司", "芯片与算力", "模型规则与底层分析", "Harness 进展"]) assert.match(html, new RegExp(heading));
   assert.match(html, /<article class="news-story/);
-  assert.match(html, /为什么值得看/);
-  assert.match(html, /需要保留的边界/);
+  assert.match(html, /story-why/);
+  assert.match(html, /story-caveat/);
+  assert.doesNotMatch(html, /为什么值得看|需要保留的边界|本期最值得注意的变化，不是/);
   assert.doesNotMatch(html, /UKGovernmentBEIS\/inspect_evals v0\.15\.0/);
   assert.doesNotMatch(html, /48 个注册源|来源不是越多越好|静默 0\/7|T4-official/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/);

@@ -25,7 +25,11 @@ test("reader projection keeps four sections and hides low-level evaluation patch
   assert.match(visible, /Kimi K3/);
   assert.match(visible, /OpenAI Agents SDK/);
   assert.match(visible, /LongStraw/);
+  assert.match(visible, /angle_label/);
+  assert.match(visible, /caveat_label/);
   assert.doesNotMatch(visible, /inspect_evals/i);
+  assert.doesNotMatch(visible, /为什么值得看|需要保留的边界/);
+  assert.doesNotMatch(output.lead, /不是.+而是/);
   assert.equal(output.reading_notes.omitted_evaluation_patch, true);
   assert.equal(output.notification_enabled, false);
 });

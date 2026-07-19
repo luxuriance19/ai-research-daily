@@ -7,8 +7,10 @@ type Story = {
   original_title?: string;
   published_at?: string | null;
   summary: string;
+  angle_label?: string;
   why_it_matters: string;
   key_points: string[];
+  caveat_label?: string;
   caveat: string;
   sources: Array<{ label: string; url: string }>;
 };
@@ -61,11 +63,11 @@ function StoryArticle({ story, featured }: { story: Story; featured: boolean }) 
       <h3>{story.title}</h3>
       {story.original_title && story.original_title !== story.title ? <p className="original-title">{story.original_title}</p> : null}
       <p className="story-summary">{story.summary}</p>
-      <div className="story-why"><strong>为什么值得看</strong><p>{story.why_it_matters}</p></div>
+      <div className="story-why"><strong>{story.angle_label || "先看重点"}</strong><p>{story.why_it_matters}</p></div>
       <ul className="story-points">
         {story.key_points.map((point) => <li key={point}>{point}</li>)}
       </ul>
-      <div className="story-caveat"><strong>需要保留的边界</strong><p>{story.caveat}</p></div>
+      <div className="story-caveat"><strong>{story.caveat_label || "还没确认"}</strong><p>{story.caveat}</p></div>
       <nav className="story-sources" aria-label={`${story.title} 的一手来源`}>
         {story.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.label} ↗</a>)}
       </nav>
@@ -86,7 +88,7 @@ function EditorialSectionBlock({ section }: { section: EditorialSection }) {
           {section.stories.map((story, index) => <StoryArticle key={story.id} story={story} featured={index === 0} />)}
         </div>
       ) : (
-        <div className="honest-empty"><span>本期留空</span><p>{section.empty_message}</p></div>
+        <div className="honest-empty"><span>今天无大事</span><p>{section.empty_message}</p></div>
       )}
     </section>
   );
@@ -107,7 +109,7 @@ export default function Home() {
           <p className="edition-date">{formatDate(editorial.date)} · 第 {editorial.date.replaceAll("-", "")} 期</p>
           <h1>{editorial.title}</h1>
           <p className="hero-deck">{editorial.deck}</p>
-          <div className="today-judgment"><span>今日判断</span><p>{editorial.lead}</p></div>
+          <div className="today-judgment"><span>编辑手记</span><p>{editorial.lead}</p></div>
           <div className="section-index" aria-label="本期栏目目录">
             {editorial.sections.map((section) => (
               <a key={section.id} href={`#${section.id}`}>
@@ -125,7 +127,7 @@ export default function Home() {
             <p>论文热度批次为 {editorial.reading_notes.paper_batch}。社区热度只帮助发现，不替代官方发布、论文、代码或版本记录。</p>
             {editorial.reading_notes.omitted_evaluation_patch ? <p>{editorial.reading_notes.note}</p> : null}
           </details>
-          <p>自动采集，人工可读；没有重要更新时宁可留空。</p>
+          <p>资料由程序汇集，正文按证据整理。没到新闻门槛的内容不占版面。</p>
         </footer>
       </article>
     </main>
