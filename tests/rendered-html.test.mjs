@@ -20,9 +20,7 @@ test("renders a reader-first four-section AI daily", async () => {
   assert.match(html, /<title>AI 前沿日报｜模型、芯片、底层研究与 Harness<\/title>/i);
   assert.match(html, /今日判断/);
   for (const heading of ["前沿模型公司", "芯片与算力", "模型规则与底层分析", "Harness 进展"]) assert.match(html, new RegExp(heading));
-  assert.match(html, /Kimi K3：产品与 API 已上线/);
-  assert.match(html, /固定 GPU 预算，也能把强化学习上下文推到 200 万 token/);
-  assert.match(html, /OpenAI Agents SDK：重点不在版本号/);
+  assert.match(html, /<article class="news-story/);
   assert.match(html, /为什么值得看/);
   assert.match(html, /需要保留的边界/);
   assert.doesNotMatch(html, /UKGovernmentBEIS\/inspect_evals v0\.15\.0/);

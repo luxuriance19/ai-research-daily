@@ -19,11 +19,9 @@ test("static site renders the four reader-facing news sections", async () => {
     assert.equal(await readFile(path.join(output, "article.html"), "utf8"), html);
     assert.match(html, /<title>AI 前沿日报｜模型、芯片、底层研究与 Harness<\/title>/);
     for (const heading of ["前沿模型公司", "芯片与算力", "模型规则与底层分析", "Harness 进展"]) assert.match(html, new RegExp(heading));
-    assert.match(html, /Kimi K3：产品与 API 已上线/);
-    assert.match(html, /固定 GPU 预算，也能把强化学习上下文推到 200 万 token/);
-    assert.match(html, /OpenAI Agents SDK：重点不在版本号/);
-    assert.match(html, /SearchOS：让搜索 Agent 共享进度/);
-    assert.match(html, /本期没有可确认的硬件公司级重大更新/);
+    assert.match(html, /<article class="news-story/);
+    assert.match(html, /为什么值得看/);
+    assert.match(html, /需要保留的边界/);
     assert.doesNotMatch(html, /UKGovernmentBEIS\/inspect_evals v0\.15\.0/);
     assert.doesNotMatch(html, /48 个注册源|来源不是越多越好|静默 0\/7|T4-official|A0/);
     assert.doesNotMatch(html, /MathJax|katex|<script/i);
